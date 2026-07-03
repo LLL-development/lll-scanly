@@ -1,0 +1,36 @@
+{
+  "name": "scanly",
+  "version": "1.0.0",
+  "description": "Scanly — Website Content Checker for pre-deployment validation",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsx src/index.ts",
+    "scan": "tsx src/index.ts",
+    "ui": "tsx src/server.ts"
+  },
+  "bin": {
+    "scanly": "./dist/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LLL-development/scanly.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/LLL-development/scanly/issues"
+  },
+  "homepage": "https://github.com/LLL-development/scanly#readme",
+  "dependencies": {
+    "commander": "^15.0.0",
+    "playwright": "^1.61.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "tsx": "^4.22.5",
+    "typescript": "^6.0.3"
+  }
+}
