@@ -1,0 +1,18 @@
+{
+  "targetUrl": "https://example.com",
+  "maxPages": 50,
+  "maxDepth": 5,
+  "timeout": 30000,
+  "excludePatterns": ["*.pdf", "*.doc", "*.docx", "*.xls", "*.xlsx"],
+  "includePatterns": [],
+  "reportFormat": "text",
+  "reportOutput": "",
+  "checkers": {
+    "missingAlt": true,
+    "brokenLinks": true,
+    "emptyPictures": true,
+    "emptyButtons": true,
+    "formatCheck": true,
+    "errorRender": true
+  }
+}
