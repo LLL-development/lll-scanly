@@ -6,45 +6,51 @@ export class ErrorRenderChecker implements Checker {
   name = 'Error Rendering';
   severity: IssueSeverity = 'error';
 
-  async scan(url: string, _maxPages?: number, timeout: number = 30000, options?: { signal?: AbortSignal }): Promise<Issue[]> {
+  async scan(url: string, _maxPages?: number, timeout?: number, options?: { signal?: AbortSignal; page?: import('playwright').Page; context?: import('playwright').BrowserContext; maxDepth?: number; excludePatterns?: string[]; includePatterns?: string[] }): Promise<Issue[]> {
     const issues: Issue[] = [];
     const signal = options?.signal;
+    const page = options?.page;
 
     if (signal?.aborted) {
       return issues;
     }
 
-    signal?.addEventListener('abort', () => {
-      throw new Error('Scan aborted by user');
-    });
+    if (!page) {
+      issues.push({
+        type: 'error-render',
+        severity: 'error',
+        url,
+        message: 'No page context provided',
+      });
+      return issues;
+    }
 
-    const browser = await import('playwright').then(m => m.chromium.launch({ headless: true }));
     try {
-      const context = await browser.newContext();
-      const page = await context.newPage();
-      await page.goto(url, { waitUntil: 'networkidle', timeout });
+      const images = await getImages(page, url);
 
-      const images = await getImages(page);
-
-      for (const img of images) {
+      for (let i = 0; i < images.length; i++) {
         if (signal?.aborted) {
           throw new Error('Scan aborted by user');
         }
+        const img = images[i];
         if (!img.src) continue;
 
-        const imgLoaded = await page.evaluate((src) => {
+        const rawSrc = img.rawSrc || img.src;
+        const escapedSrc = rawSrc.replace(/([!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~])/g, '\\$1');
+        
+        const imgLoaded = await page.evaluate((src: string) => {
           const el = document.querySelector(`img[src="${src}"]`);
           if (!el) return false;
           const imgEl = el as HTMLImageElement;
-          return imgEl.naturalWidth > 0 && !imgEl.complete === false;
-        }, img.src);
+          return imgEl.naturalWidth > 0 && imgEl.complete;
+        }, escapedSrc);
 
         if (!imgLoaded) {
           issues.push({
             type: 'error-render',
             severity: 'error',
             url,
-            element: `<img src="${img.src}">`,
+            element: `<img src="${rawSrc}">`,
             message: `Image failed to render: ${img.src}`,
             suggestion: 'Fix the image path or ensure the file exists',
           });
@@ -60,10 +66,13 @@ export class ErrorRenderChecker implements Checker {
         if (signal?.aborted) {
           throw new Error('Scan aborted by user');
         }
-        const iframeExists = await page.evaluate((src) => {
+        
+        const escapedIframeSrc = iframeSrc.replace(/([!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~])/g, '\\$1');
+        
+        const iframeExists = await page.evaluate((src: string) => {
           const el = document.querySelector(`iframe[src="${src}"]`);
           return el !== null;
-        }, iframeSrc);
+        }, escapedIframeSrc);
 
         if (!iframeExists) {
           issues.push({
@@ -95,14 +104,7 @@ export class ErrorRenderChecker implements Checker {
       if (err instanceof Error && err.message === 'Scan aborted by user') {
         throw err;
       }
-      issues.push({
-        type: 'error-render',
-        severity: 'error',
-        url,
-        message: `Failed to load page: ${url}`,
-      });
-    } finally {
-      await browser.close();
+      return issues;
     }
 
     return issues;

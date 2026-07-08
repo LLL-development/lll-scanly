@@ -11,6 +11,7 @@ const MIME_TYPES: Record<string, string> = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.svg': 'image/svg+xml',
+  '.webp': 'image/webp',
 };
 
 const server = createServer(async (req, res) => {
@@ -22,7 +23,8 @@ const server = createServer(async (req, res) => {
     for await (const chunk of req) {
       body += chunk;
     }
-    const { scanUrl, maxPages, timeout } = JSON.parse(body);
+    const parsed = JSON.parse(body);
+    const { scanUrl, maxPages, timeout, scanId, scanMode } = parsed;
 
     if (!scanUrl) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -30,34 +32,57 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    const maxDepth = parseInt(parsed.maxDepth || '5', 10);
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    const result = await api.scan(scanUrl, parseInt(maxPages || '1', 10), parseInt(timeout || '60000', 10));
+    const result = await api.scan(scanUrl, parseInt(maxPages || '1', 10), parseInt(timeout || '60000', 10), maxDepth, scanMode);
     res.end(JSON.stringify(result));
     return;
   }
 
   if (url.pathname === '/api/status' && req.method === 'GET') {
+    const activeScans = api.getActiveScans();
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ scanning: api.isBusy() }));
+    res.end(JSON.stringify({ 
+      scanning: api.isBusy(), 
+      activeScans: activeScans,
+      activeCount: activeScans.length
+    }));
     return;
   }
 
   if (url.pathname === '/api/result' && req.method === 'GET') {
+    const scanId = url.searchParams.get('scanId');
+    const result = api.getResult(scanId || '');
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(api.getResult()));
+    res.end(JSON.stringify(result));
     return;
   }
 
   if (url.pathname === '/api/progress' && req.method === 'GET') {
+    const scanId = url.searchParams.get('scanId');
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(api.getProgress()));
+    res.end(JSON.stringify(api.getProgress(scanId || '')));
     return;
   }
 
   if (url.pathname === '/api/stop' && req.method === 'POST') {
+    let body = '';
+    for await (const chunk of req) {
+      body += chunk;
+    }
+    const { scanId } = JSON.parse(body || '{}');
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    const result = await api.stop();
+    const result = await api.stop(scanId || '');
     res.end(JSON.stringify(result));
+    return;
+  }
+
+  if (url.pathname === '/api/events' && req.method === 'GET') {
+    const scanId = url.searchParams.get('scanId');
+    const since = parseInt(url.searchParams.get('since') || '0', 10);
+    const events = api.getEvents(scanId || '', since);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ events, count: events.length }));
     return;
   }
 
@@ -68,9 +93,15 @@ const server = createServer(async (req, res) => {
   const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
   try {
-    const content = readFileSync(fullPath, 'utf-8');
-    res.writeHead(200, { 'Content-Type': contentType });
-    res.end(content);
+    if (['.png', '.jpg', '.svg', '.webp'].includes(ext)) {
+      const content = readFileSync(fullPath);
+      res.writeHead(200, { 'Content-Type': contentType });
+      res.end(content);
+    } else {
+      const content = readFileSync(fullPath, 'utf-8');
+      res.writeHead(200, { 'Content-Type': contentType });
+      res.end(content);
+    }
   } catch {
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('Not Found');
@@ -83,7 +114,7 @@ server.listen(4000, () => {
 
 process.on('SIGINT', () => {
   console.log('\n  Shutting down Scanly...');
-  api.stop().then(() => {
+  api.stop('').then(() => {
     server.close(() => process.exit(0));
   }).catch(() => {
     server.close(() => process.exit(0));
@@ -92,7 +123,7 @@ process.on('SIGINT', () => {
 
 process.on('SIGTERM', () => {
   console.log('\n  Shutting down Scanly...');
-  api.stop().then(() => {
+  api.stop('').then(() => {
     server.close(() => process.exit(0));
   }).catch(() => {
     server.close(() => process.exit(0));

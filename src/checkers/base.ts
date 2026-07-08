@@ -12,5 +12,5 @@ export interface Issue {
 export interface Checker {
   name: string;
   severity: IssueSeverity;
-  scan(url: string, maxPages?: number, timeout?: number, options?: { signal?: AbortSignal }): Promise<Issue[]>;
+  scan(url: string, maxPages?: number, timeout?: number, options?: { signal?: AbortSignal; page?: import('playwright').Page; context?: import('playwright').BrowserContext; maxDepth?: number; excludePatterns?: string[]; includePatterns?: string[] }): Promise<Issue[]>;
 }

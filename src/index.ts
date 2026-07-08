@@ -29,16 +29,40 @@ program
       process.exit(1);
     }
 
-    const maxPages = parseInt(opts?.maxPages || config.maxPages || '50', 10);
-    const timeout = parseInt(opts?.timeout || config.timeout || '30000', 10);
+    // Validate URL format
+    try {
+      new URL(targetUrl);
+    } catch {
+      console.error(`Error: Invalid URL: ${targetUrl}`);
+      console.error('Please provide a valid URL (e.g., https://example.com)');
+      process.exit(1);
+    }
+
+    const maxPages = parseInt(opts?.maxPages || String(config.maxPages) || '50', 10);
+    const maxDepth = config.maxDepth || 5;
+    const timeout = parseInt(opts?.timeout || String(config.timeout) || '30000', 10);
     const format = opts?.format || config.reportFormat || 'text';
     const output = opts?.output || config.reportOutput;
 
-    console.log(`\nScanning: ${targetUrl}`);
-    console.log(`Format: ${format} | Max pages: ${maxPages} | Timeout: ${timeout}ms\n`);
+    // Validate numeric inputs
+    if (isNaN(maxPages) || maxPages < 1) {
+      console.error('Error: maxPages must be a positive number');
+      process.exit(1);
+    }
+    if (isNaN(maxDepth) || maxDepth < 1) {
+      console.error('Error: maxDepth must be a positive number');
+      process.exit(1);
+    }
+    if (isNaN(timeout) || timeout < 1000) {
+      console.error('Error: timeout must be at least 1000ms');
+      process.exit(1);
+    }
 
-    const scanner = new Scanner();
-    const result = await scanner.scan(targetUrl, { maxPages, timeout });
+    console.log(`\nScanning: ${targetUrl}`);
+    console.log(`Format: ${format} | Max pages: ${maxPages} | Max depth: ${maxDepth} | Timeout: ${timeout}ms\n`);
+
+    const scanner = new Scanner(config);
+    const result = await scanner.scan(targetUrl, { maxPages, timeout, maxDepth });
 
     let report: string;
     switch (format) {

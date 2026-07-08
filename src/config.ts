@@ -23,7 +23,7 @@ export interface ScanlyConfig {
 export const DEFAULT_CONFIG: Partial<ScanlyConfig> = {
   maxPages: 50,
   maxDepth: 5,
-  timeout: 10000,
+  timeout: 12000,
   excludePatterns: ['*.pdf', '*.doc', '*.docx', '*.xls', '*.xlsx'],
   includePatterns: [],
   reportFormat: 'text',

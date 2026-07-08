@@ -7,19 +7,29 @@ export interface ButtonInfo {
   outerHTML: string;
 }
 
-export async function getImages($page: Page): Promise<Array<{ src: string; alt: string; role: string | null; ariaHidden: string | null }>> {
-  return await $page.evaluate(() => {
-    const images: Array<{ src: string; alt: string; role: string | null; ariaHidden: string | null }> = [];
+export async function getImages($page: Page, baseUrl: string): Promise<Array<{ src: string; alt: string; role: string | null; ariaHidden: string | null; rawSrc: string }>> {
+  return await $page.evaluate(({ base }) => {
+    const images: Array<{ src: string; alt: string; role: string | null; ariaHidden: string | null; rawSrc: string }> = [];
     document.querySelectorAll('img').forEach(img => {
+      const rawSrc = img.getAttribute('src') ?? '';
+      let resolvedSrc = rawSrc;
+      if (rawSrc) {
+        try {
+          resolvedSrc = new URL(rawSrc, base).href;
+        } catch {
+          resolvedSrc = rawSrc;
+        }
+      }
       images.push({
-        src: img.getAttribute('src') ?? '',
+        src: resolvedSrc,
         alt: img.getAttribute('alt') ?? '',
         role: img.getAttribute('role'),
         ariaHidden: img.getAttribute('aria-hidden'),
+        rawSrc: rawSrc,
       });
     });
     return images;
-  });
+  }, { base: baseUrl });
 }
 
 export async function getLinks($page: Page, baseUrl: string): Promise<string[]> {
@@ -98,4 +108,41 @@ export async function getConsoleErrors($page: Page): Promise<string[]> {
   return await $page.evaluate(() => {
     return [];
   });
+}
+
+/**
+ * Check if a URL matches any of the provided glob patterns
+ * Supports * (matches any characters) and ? (matches single character)
+ */
+export function matchesPattern(url: string, patterns: string[]): boolean {
+  if (patterns.length === 0) return true; // No patterns = match all
+  
+  const urlPath = new URL(url).pathname;
+  
+  return patterns.some(pattern => {
+    // Convert glob pattern to regex
+    const regexPattern = pattern
+      .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape special regex chars
+      .replace(/\*/g, '.*') // * matches any characters
+      .replace(/\?/g, '.'); // ? matches single character
+    
+    const regex = new RegExp(`^${regexPattern}$`);
+    return regex.test(urlPath);
+  });
+}
+
+/**
+ * Check if a URL should be excluded based on exclude patterns
+ */
+export function shouldExclude(url: string, excludePatterns: string[]): boolean {
+  return matchesPattern(url, excludePatterns);
+}
+
+/**
+ * Check if a URL should be included based on include patterns
+ * If no include patterns, all URLs are included (unless excluded)
+ */
+export function shouldInclude(url: string, includePatterns: string[]): boolean {
+  if (includePatterns.length === 0) return true;
+  return matchesPattern(url, includePatterns);
 }
