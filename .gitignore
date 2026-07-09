@@ -4,4 +4,3 @@ dist/
 .env
 .scanly/
 coverage/
-*.html

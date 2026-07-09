@@ -3,6 +3,8 @@ import { Scanner } from './scanner.js';
 import { reportText } from './reporters/text.js';
 import { reportJson } from './reporters/json.js';
 import { reportHtml } from './reporters/html.js';
+import { reportCsv } from './reporters/csv.js';
+import { reportPdf } from './reporters/pdf.js';
 import { loadConfig } from './config.js';
 
 const program = new Command();
@@ -15,8 +17,9 @@ program
 program
   .argument('[url]', 'URL to scan')
   .option('-c, --config <path>', 'Path to config file')
-  .option('-f, --format <format>', 'Report format: text, json, html', 'text')
+  .option('-f, --format <format>', 'Report format: text, json, html, csv, pdf', 'text')
   .option('-o, --output <path>', 'Output file path')
+  .option('--lang <language>', 'Report language: en, ja, zh, zh-TW, ko, ms', 'en')
   .option('--max-pages <number>', 'Maximum pages to crawl', '50')
   .option('--timeout <ms>', 'Request timeout in milliseconds', '30000')
   .action(async (url?: string, opts?: any) => {
@@ -43,6 +46,7 @@ program
     const timeout = parseInt(opts?.timeout || String(config.timeout) || '30000', 10);
     const format = opts?.format || config.reportFormat || 'text';
     const output = opts?.output || config.reportOutput;
+    const lang = opts?.lang || 'en';
 
     // Validate numeric inputs
     if (isNaN(maxPages) || maxPages < 1) {
@@ -59,18 +63,24 @@ program
     }
 
     console.log(`\nScanning: ${targetUrl}`);
-    console.log(`Format: ${format} | Max pages: ${maxPages} | Max depth: ${maxDepth} | Timeout: ${timeout}ms\n`);
+    console.log(`Format: ${format} | Language: ${lang} | Max pages: ${maxPages} | Max depth: ${maxDepth} | Timeout: ${timeout}ms\n`);
 
     const scanner = new Scanner(config);
     const result = await scanner.scan(targetUrl, { maxPages, timeout, maxDepth });
 
-    let report: string;
+    let report: string | null;
     switch (format) {
       case 'json':
         report = reportJson(result);
         break;
       case 'html':
-        report = reportHtml(result);
+        report = reportHtml(result, lang);
+        break;
+      case 'csv':
+        report = reportCsv(result, lang);
+        break;
+      case 'pdf':
+        report = null;
         break;
       default:
         report = reportText(result);
@@ -80,8 +90,19 @@ program
       const fs = await import('node:fs');
       const pathMod = await import('node:path');
       const outputPath = pathMod.resolve(output);
-      fs.writeFileSync(outputPath, report, 'utf-8');
-      console.log(`Report written to: ${outputPath}\n`);
+
+      if (format === 'pdf') {
+        const pdfBuffer = await reportPdf(result, lang);
+        fs.writeFileSync(outputPath, pdfBuffer);
+        console.log(`Report written to: ${outputPath}\n`);
+      } else if (format === 'csv') {
+        const bom = '\uFEFF';
+        fs.writeFileSync(outputPath, bom + report!, 'utf-8');
+        console.log(`Report written to: ${outputPath}\n`);
+      } else {
+        fs.writeFileSync(outputPath, report!, 'utf-8');
+        console.log(`Report written to: ${outputPath}\n`);
+      }
     } else {
       console.log(report);
     }
