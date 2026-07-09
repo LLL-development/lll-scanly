@@ -8,7 +8,7 @@ export interface ScanlyConfig {
   timeout: number;
   excludePatterns: string[];
   includePatterns: string[];
-  reportFormat: 'text' | 'json' | 'html';
+  reportFormat: 'text' | 'json' | 'html' | 'csv' | 'pdf';
   reportOutput: string;
   checkers: {
     missingAlt: boolean;

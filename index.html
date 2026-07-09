@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanly - Website Checker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Header Banner -->
+    <div class="app-header">
+        <div class="app-header-logo">
+            <img src="images/logo.webp" alt="Scanly Logo" class="app-header-logo-img">
+        </div>
+        <select id="langSelector">
+            <option value="en">English</option>
+            <option value="ja">日本語</option>
+            <option value="zh">中文</option>
+            <option value="zh-TW">繁體中文</option>
+            <option value="ko">한국어</option>
+            <option value="ms">Melayu</option>
+        </select>
+    </div>
+
+    <!-- Grainy Texture Overlay -->
+    <div class="grain-overlay"></div>
+
+    <!-- Splash Screen -->
+    <div class="splash" id="splash">
+        <div class="splash-inner">
+            <h1>Scanly</h1>
+            <p class="splash-tagline" id="splashTagline"></p>
+            <p class="splash-hint">Click anywhere to begin</p>
+        </div>
+    </div>
+
+    <!-- Main Scene (URL Input) -->
+    <div class="scene" id="mainInterface">
+        
+        <!-- Typewriter Instructions -->
+        <div class="typewriter-container" id="typewriterContainer">
+            <div class="typewriter-line" id="typewriterLine1"></div>
+            <div class="typewriter-line" id="typewriterLine2"></div>
+            <div class="typewriter-line" id="typewriterLine3"></div>
+            <span class="typewriter-cursor" id="typewriterCursor">_</span>
+        </div>
+
+        <!-- THE MONSTER (Stacked SVGs) -->
+        <div class="monster-container" id="monster">
+            <!-- 1. The Base Body -->
+            <img src="images/monster-base.svg" class="monster-layer layer-base" alt="Monster Body">
+            
+            <!-- 2. The Pupils (Will move with JS) -->
+            <img src="images/monster-pupils.svg" class="monster-layer layer-pupils" id="pupils" alt="Monster Pupils">
+            
+            <!-- 3. The Mouth (Will animate with CSS) -->
+            <img src="images/monster-mouth.svg" class="monster-layer layer-mouth" id="mouth" alt="Monster Mouth">
+        </div>
+
+        <!-- Input Surface -->
+        <div class="input-surface">
+            <div class="input-wrapper">
+                <div class="url-input-container">
+                    <input type="text" class="url-input" placeholder="https://your-website.com" id="urlInput" data-i18n-placeholder="urlPlaceholder">
+                    <button class="clear-btn" id="clearBtn" title="Clear" data-i18n="clearBtn">X</button>
+                </div>
+                <button class="tips-btn" id="tipsBtn" title="Tips">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M15 14c.2-1 .4-1.9.4-3 0-2.8-2.2-5-5-5S5 8.2 5 11c0 1.1.2 2 .4 3"/>
+                        <path d="M9 18h6"/>
+                        <path d="M10 22h4"/>
+                        <path d="M14.5 9.5l2.5-2.5a1 1 0 0 1 1.4 1.4l-2.5 2.5"/>
+                        <path d="M9.5 9.5L7 7a1 1 0 0 0-1.4 1.4l2.5 2.5"/>
+                    </svg>
+                </button>
+            </div>
+            <button class="scan-btn" id="scanBtn" data-i18n="scanBtn">SCAN</button>
+            <button class="scan-btn" id="stopBtn" style="display: none;" data-i18n="stopBtn">STOP</button>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="progress-bar" id="progressBar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+
+        <!-- Loading State -->
+        <div class="loading-state" id="loadingState">
+            <span class="loading-phrase" id="loadingPhrase"></span>
+        </div>
+
+        <!-- Scan Mode Selector -->
+        <div class="scan-mode-selector" id="scanModeSelector">
+            <div class="scan-mode-options">
+                <label class="scan-mode-option">
+                    <input type="radio" name="scanMode" value="quick" checked>
+                    <span class="mode-label">
+                        <span class="mode-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                            </svg>
+                        </span>
+                        <span class="mode-text" data-i18n="quickScan">Quick Scan</span>
+                        <span class="mode-desc" data-i18n="quickScanDesc">1 page</span>
+                    </span>
+                </label>
+                <label class="scan-mode-option">
+                    <input type="radio" name="scanMode" value="deep">
+                    <span class="mode-label">
+                        <span class="mode-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="2" y1="12" x2="22" y2="12"/>
+                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                            </svg>
+                        </span>
+                        <span class="mode-text" data-i18n="deepScan">Deep Scan</span>
+                        <span class="mode-desc" data-i18n="deepScanDesc">All pages (max 20)</span>
+                    </span>
+                </label>
+                <label class="scan-mode-option">
+                    <input type="radio" name="scanMode" value="custom">
+                    <span class="mode-label">
+                        <span class="mode-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="3"/>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                            </svg>
+                        </span>
+                        <span class="mode-text" data-i18n="customScan">Custom</span>
+                        <span class="mode-desc" data-i18n="customScanDesc">Your settings</span>
+                    </span>
+                </label>
+            </div>
+            
+            <div class="custom-scan-settings" id="customScanSettings" style="display: none;">
+                <div class="custom-scan-help">
+                    <span class="help-icon">?</span>
+                    <span class="help-text" id="customScanHelpText" data-i18n="customScanHelp">
+                        <strong>Max Pages:</strong> Total pages to scan (1 = homepage only, 50 = homepage + 49 sub-pages)<br>
+                        <strong>Max Depth:</strong> How many clicks from homepage (1 = homepage only, 3 = homepage → links → links of links)
+                    </span>
+                </div>
+                <div class="custom-scan-fields">
+                    <div class="setting-group">
+                        <label for="customMaxPages">Max Pages:</label>
+                        <input type="number" id="customMaxPages" placeholder="50" min="1" max="50" value="50">
+                    </div>
+                    <div class="setting-group">
+                        <label for="customMaxDepth">Max Depth:</label>
+                        <input type="number" id="customMaxDepth" placeholder="5" min="1" max="5" value="5">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Report View (Printer-style document output) -->
+    <div class="report-view" id="reportView">
+        
+        <!-- Printer slot / output tray -->
+        <div class="printer-slot">
+            <div class="slot-lip"></div>
+            <div class="slot-glow"></div>
+            <div class="printer-slot-content">
+            </div>
+        </div>
+
+        <!-- The printed document that scrolls out -->
+        <div class="report-document" id="reportDocument">
+            
+            <!-- Document header -->
+            <div class="doc-header">
+                <div class="doc-header-top">
+                    <div class="doc-stamp">SCANLY</div>
+                    <div class="doc-header-info">
+                        <div class="doc-title" data-i18n="reportTitle">Website Scan Report</div>
+                        <div class="doc-url" id="reportUrl">https://example.com</div>
+                        <div class="doc-scan-info" id="docScanInfo">Quick Scan · 1 page</div>
+                    </div>
+                </div>
+                <div class="doc-divider"></div>
+            </div>
+
+            <!-- Summary cards -->
+            <div class="doc-summary">
+                <div class="doc-stat errors">
+                    <span class="stat-number" id="reportErrorCount">0</span>
+                    <span class="stat-label" data-i18n="errors">Errors</span>
+                </div>
+                <div class="doc-stat warnings">
+                    <span class="stat-number" id="reportWarningCount">0</span>
+                    <span class="stat-label" data-i18n="warnings">Warnings</span>
+                </div>
+                <div class="doc-stat passed">
+                    <span class="stat-number" id="reportPassedCount">0</span>
+                    <span class="stat-label" data-i18n="passed">Passed</span>
+                </div>
+            </div>
+
+            <div class="doc-divider"></div>
+
+            <!-- Page selector for multi-page scans -->
+            <div class="page-selector" id="pageSelector" style="display: none;">
+                <div class="page-selector-header">
+                    <span class="page-selector-label" data-i18n="pagesScanned">Pages scanned:</span>
+                    <select id="pageSelect" class="page-select-dropdown"></select>
+                </div>
+                <div class="page-selector-stats" id="pageSelectorStats"></div>
+            </div>
+
+            <!-- Issues list with sections -->
+            <div id="reportIssuesList">
+                <!-- Issue sections will be inserted here by JavaScript -->
+            </div>
+
+            <!-- Footer -->
+            <div class="doc-footer">
+                <div class="doc-divider"></div>
+                <div class="download-bar" style="display: none;">
+                    <select id="downloadFormat" class="download-format-select">
+                        <option value="pdf">PDF</option>
+                        <option value="csv">CSV</option>
+                    </select>
+                    <button class="download-btn" id="downloadBtn" data-i18n="downloadReport">Download Report</button>
+                    <button class="scan-again-button" id="scanAgainButton" data-i18n="scanAnother">Scan Another URL</button>
+                </div>
+                <p>Scanly — Website Content Checker</p>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Terminal View (Real-time scanning output) -->
+    <div class="terminal-view" id="terminalView">
+        <div class="terminal-header">
+            <span class="terminal-header-title" data-i18n="terminalTitle">Scanly Terminal</span>
+            <button class="terminal-expand-btn" id="terminalExpandBtn" data-i18n-title="terminalExpand">
+                <span class="expand-icon">⤢</span>
+            </button>
+            <button class="terminal-stop-btn" id="terminalStopBtn" data-i18n="terminalStop">STOP</button>
+        </div>
+        <div class="terminal-output" id="terminalOutput">
+            <!-- Real-time logs will appear here -->
+        </div>
+        <div class="terminal-loading" id="terminalLoading">
+            <div class="terminal-loading-dot"></div>
+            <div class="terminal-loading-dot"></div>
+            <div class="terminal-loading-dot"></div>
+        </div>
+        <div class="terminal-footer">
+            <span class="terminal-prompt">❯</span>
+            <span class="terminal-status" id="terminalStatus" data-i18n="terminalScanning">Scanning...</span>
+        </div>
+    </div>
+
+    <!-- Tips Modal -->
+    <div class="tips-overlay" id="tipsOverlay">
+        <div class="tips-modal">
+            <button class="tips-close" id="tipsClose">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+            <div class="tips-header">
+                <svg class="tips-bulb-icon" xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M15 14c.2-1 .4-1.9.4-3 0-2.8-2.2-5-5-5S5 8.2 5 11c0 1.1.2 2 .4 3"/>
+                    <path d="M9 18h6"/>
+                    <path d="M10 22h4"/>
+                </svg>
+                <h3 data-i18n="tipsTitle">Tips</h3>
+            </div>
+            <div class="tips-content">
+                <div class="tip-section">
+                    <h4 data-i18n="tipAcceptedUrlsTitle">Accepted URLs</h4>
+                    <ul id="tipAcceptedUrls"></ul>
+                </div>
+                <div class="tip-section">
+                    <h4 data-i18n="tipScanModesTitle">Scan Modes</h4>
+                    <ul id="tipScanModes"></ul>
+                </div>
+                <div class="tip-section">
+                    <h4 data-i18n="tipWhatWeCheckTitle">What We Check</h4>
+                    <ul id="tipWhatWeCheck"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="translations.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

@@ -325,6 +325,8 @@ const scanAgainButton = document.getElementById('scanAgainButton');
 const pageSelector = document.getElementById('pageSelector');
 const pageSelect = document.getElementById('pageSelect');
 const pageSelectorStats = document.getElementById('pageSelectorStats');
+const downloadFormat = document.getElementById('downloadFormat');
+const downloadBtn = document.getElementById('downloadBtn');
 
 // ===== TIPS MODAL =====
 function openTips() {
@@ -436,6 +438,52 @@ terminalExpandBtn.addEventListener('click', function(e) {
 });
 
 scanAgainButton.addEventListener('click', resetToIdle);
+
+downloadBtn.addEventListener('click', function() {
+    console.log('[download] currentScanId:', currentScanId, 'lastScanResult:', lastScanResult);
+    if (!currentScanId || !lastScanResult) {
+        console.warn('[download] Cannot download: missing scanId or result');
+        return;
+    }
+    
+    downloadBtn.disabled = true;
+    downloadBtn.textContent = languageSelector.t('downloading') || 'Downloading...';
+    
+    var format = downloadFormat.value;
+    var lang = languageSelector.currentLang || 'en';
+    var downloadUrl = '/api/download?format=' + format + '&scanId=' + encodeURIComponent(currentScanId) + '&lang=' + encodeURIComponent(lang);
+    console.log('[download] Fetching:', downloadUrl);
+    
+    fetch(downloadUrl)
+        .then(function(response) {
+            console.log('[download] Response status:', response.status);
+            if (!response.ok) {
+                return response.text().then(function(text) {
+                    throw new Error('HTTP ' + response.status + ': ' + text);
+                });
+            }
+            return response.blob();
+        })
+        .then(function(blob) {
+            console.log('[download] Blob size:', blob.size);
+            var url = window.URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'scanly-report-' + currentScanId + '.' + (format === 'pdf' ? 'pdf' : 'csv');
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        })
+        .catch(function(err) {
+            console.error('[download] Failed:', err);
+            alert('Download failed: ' + err.message);
+        })
+        .finally(function() {
+            downloadBtn.disabled = false;
+            downloadBtn.textContent = languageSelector.t('downloadReport') || 'Download Report';
+        });
+});
 
 window.addEventListener('beforeunload', function() {
     if (scanBtn.disabled && currentScanId) {
@@ -870,6 +918,14 @@ function showReportView() {
     reportDocument.style.animation = 'none';
     void reportDocument.offsetHeight;
     reportDocument.style.animation = '';
+    
+    var downloadBar = document.querySelector('.download-bar');
+    if (downloadBar) {
+        downloadBar.style.display = 'flex';
+    }
+    if (scanAgainButton) {
+        scanAgainButton.style.display = 'inline-block';
+    }
 }
 
 function hideReportView() {
@@ -1127,7 +1183,8 @@ var retranslateReport = function() {
 function resetToIdle() {
     currentScanId = null;
     hideReportView();
-    scanAgainButton.style.display = 'none';
+    var downloadBar = document.querySelector('.download-bar');
+    if (downloadBar) downloadBar.style.display = 'none';
     urlInput.value = '';
     urlInput.disabled = false;
     scanBtn.disabled = false;
