@@ -1,7 +1,7 @@
 import type { Page } from 'playwright';
-import { Checker, Issue, IssueSeverity } from './base';
-import { getImages } from '../utils/dom';
-import { checkLink } from '../utils/http';
+import { Checker, Issue, IssueSeverity } from './base.js';
+import { getImages } from '../utils/dom.js';
+import { checkLink } from '../utils/http.js';
 
 export class EmptyPictureChecker implements Checker {
   name = 'Empty Pictures';

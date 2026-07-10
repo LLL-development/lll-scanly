@@ -1,6 +1,6 @@
 import type { Page } from 'playwright';
-import { Checker, Issue, IssueSeverity } from './base';
-import { getButtons } from '../utils/dom';
+import { Checker, Issue, IssueSeverity } from './base.js';
+import { getButtons } from '../utils/dom.js';
 
 export class EmptyButtonChecker implements Checker {
   name = 'Empty Buttons';
