@@ -19,8 +19,9 @@ const MIME_TYPES: Record<string, string> = {
 
 const ALLOWED_ORIGINS = [
   'https://lll-scanly.pages.dev',
-  'http://localhost:3000',
+  'http://localhost:4000',
   'http://localhost:5173',
+  'https://lll-scanly-api.onrender.com',
 ];
 
 function isAllowedOrigin(origin: string): boolean {
