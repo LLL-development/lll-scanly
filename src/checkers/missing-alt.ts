@@ -1,6 +1,6 @@
 import type { Page } from 'playwright';
-import { Checker, Issue, IssueSeverity } from './base';
-import { getImages } from '../utils/dom';
+import { Checker, Issue, IssueSeverity } from './base.js';
+import { getImages } from '../utils/dom.js';
 
 export class MissingAltChecker implements Checker {
   name = 'Missing Alt Text';

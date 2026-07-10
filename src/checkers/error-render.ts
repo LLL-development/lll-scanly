@@ -1,6 +1,6 @@
 import type { Page } from 'playwright';
-import { Checker, Issue, IssueSeverity } from './base';
-import { getImages, getIframes, getNoscriptCount } from '../utils/dom';
+import { Checker, Issue, IssueSeverity } from './base.js';
+import { getImages, getIframes, getNoscriptCount } from '../utils/dom.js';
 
 export class ErrorRenderChecker implements Checker {
   name = 'Error Rendering';

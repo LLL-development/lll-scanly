@@ -1,7 +1,7 @@
 import type { Page } from 'playwright';
-import { Checker, Issue, IssueSeverity } from './base';
-import { getLinks, shouldExclude, shouldInclude } from '../utils/dom';
-import { checkLink } from '../utils/http';
+import { Checker, Issue, IssueSeverity } from './base.js';
+import { getLinks, shouldExclude, shouldInclude } from '../utils/dom.js';
+import { checkLink } from '../utils/http.js';
 
 export class BrokenLinkChecker implements Checker {
   name = 'Broken Links';
