@@ -6,7 +6,7 @@ command = "node scripts/inject-api-base.js"
 output_dir = "."
 
 [pages.env]
-SCANLY_API_BASE = ""
+SCANLY_API_BASE = "https://lll-scanly-api.onrender.com"
 
 [[redirects]]
 from = "/*"
