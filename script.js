@@ -1,5 +1,12 @@
+// ===== API CONFIGURATION =====
+var API_BASE = window.SCANLY_API_BASE || '';
+
 // ===== LANGUAGE SELECTOR =====
 var languageSelector = null;
+
+function safeT(key) {
+    return languageSelector ? languageSelector.t(key) : key;
+}
 
 function initLanguageSelector() {
     var cls = (function() {
@@ -208,6 +215,7 @@ var typewriterTimeout = null;
 var typewriterRunning = false;
 
 function getTypewriterLines() {
+    if (!languageSelector) return ['', '', ''];
     return [
         languageSelector.t('typewriterLine1'),
         languageSelector.t('typewriterLine2'),
@@ -396,6 +404,31 @@ document.querySelectorAll('input[name="scanMode"]').forEach(radio => {
     });
 });
 
+var customMaxPagesInput = document.getElementById('customMaxPages');
+var customMaxDepthInput = document.getElementById('customMaxDepth');
+
+if (customMaxPagesInput) {
+    customMaxPagesInput.addEventListener('input', function() {
+        var val = parseInt(this.value, 10);
+        if (val > 50) {
+            this.value = 50;
+        } else if (val < 1 && this.value !== '') {
+            this.value = 1;
+        }
+    });
+}
+
+if (customMaxDepthInput) {
+    customMaxDepthInput.addEventListener('input', function() {
+        var val = parseInt(this.value, 10);
+        if (val > 5) {
+            this.value = 5;
+        } else if (val < 1 && this.value !== '') {
+            this.value = 1;
+        }
+    });
+}
+
 // Terminal stop button
 var terminalStopBtn = document.getElementById('terminalStopBtn');
 if (terminalStopBtn) {
@@ -447,11 +480,11 @@ downloadBtn.addEventListener('click', function() {
     }
     
     downloadBtn.disabled = true;
-    downloadBtn.textContent = languageSelector.t('downloading') || 'Downloading...';
+    downloadBtn.textContent = safeT('downloading') || 'Downloading...';
     
     var format = downloadFormat.value;
     var lang = languageSelector.currentLang || 'en';
-    var downloadUrl = '/api/download?format=' + format + '&scanId=' + encodeURIComponent(currentScanId) + '&lang=' + encodeURIComponent(lang);
+    var downloadUrl = API_BASE + '/api/download?format=' + format + '&scanId=' + encodeURIComponent(currentScanId) + '&lang=' + encodeURIComponent(lang);
     console.log('[download] Fetching:', downloadUrl);
     
     fetch(downloadUrl)
@@ -481,13 +514,13 @@ downloadBtn.addEventListener('click', function() {
         })
         .finally(function() {
             downloadBtn.disabled = false;
-            downloadBtn.textContent = languageSelector.t('downloadReport') || 'Download Report';
+            downloadBtn.textContent = safeT('downloadReport') || 'Download Report';
         });
 });
 
 window.addEventListener('beforeunload', function() {
     if (scanBtn.disabled && currentScanId) {
-        navigator.sendBeacon('/api/stop', JSON.stringify({ scanId: currentScanId }));
+        navigator.sendBeacon(API_BASE + '/api/stop', JSON.stringify({ scanId: currentScanId }));
     }
 });
 
@@ -546,8 +579,10 @@ function startScan() {
         maxPages = 20;
         maxDepth = 3;
     } else if (scanMode === 'custom') {
-        maxPages = parseInt(document.getElementById('customMaxPages').value) || 50;
-        maxDepth = parseInt(document.getElementById('customMaxDepth').value) || 5;
+        var pagesVal = parseInt(document.getElementById('customMaxPages').value, 10);
+        var depthVal = parseInt(document.getElementById('customMaxDepth').value, 10);
+        maxPages = (isNaN(pagesVal) || pagesVal < 1) ? 1 : Math.min(pagesVal, 50);
+        maxDepth = (isNaN(depthVal) || depthVal < 1) ? 1 : Math.min(depthVal, 5);
     }
 
     console.log('Showing terminal view');
@@ -558,13 +593,13 @@ function startScan() {
     mainInterface.style.cssText = 'display: none !important; animation: none !important;';
     terminalView.style.cssText = 'display: flex !important; opacity: 1 !important;';
     terminalOutput.innerHTML = '';
-    terminalStatus.textContent = languageSelector.t('terminalInitializing');
+    terminalStatus.textContent = safeT('terminalInitializing');
     lastEventIndex = 0;
     
     console.log('Main interface display:', mainInterface.style.display);
     console.log('Terminal view display:', terminalView.style.display);
 
-    fetch('/api/scan', {
+    fetch(API_BASE + '/api/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -592,12 +627,12 @@ function startScan() {
             resetToIdle();
             return;
         }
-        setErrorState(languageSelector.t('connectError'));
+        setErrorState(safeT('connectError'));
     });
 }
 
 function stopScan() {
-    fetch('/api/stop', {
+    fetch(API_BASE + '/api/stop', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scanId: currentScanId }),
@@ -620,7 +655,7 @@ function stopScan() {
         reportErrorCount.textContent = '1';
         reportWarningCount.textContent = '0';
         reportPassedCount.textContent = '0';
-        reportIssuesList.innerHTML = '\x3Cdiv class="error-card"\x3E\x3Ch4>' + languageSelector.t('scanFailed') + '\x3C/h4\x3E\x3Cp>' + languageSelector.t('scanAborted') + '\x3C/p\x3E\x3C/div>';
+        reportIssuesList.innerHTML = '\x3Cdiv class="error-card"\x3E\x3Ch4>' + safeT('scanFailed') + '\x3C/h4\x3E\x3Cp>' + safeT('scanAborted') + '\x3C/p\x3E\x3C/div>';
     })
     .catch(function() {
         stopProgressPolling();
@@ -640,7 +675,7 @@ function stopScan() {
         reportErrorCount.textContent = '1';
         reportWarningCount.textContent = '0';
         reportPassedCount.textContent = '0';
-        reportIssuesList.innerHTML = '\x3Cdiv class="error-card"\x3E\x3Ch4>' + languageSelector.t('scanFailed') + '\x3C/h4\x3E\x3Cp>' + languageSelector.t('scanAborted') + '\x3C/p\x3E\x3C/div>';
+        reportIssuesList.innerHTML = '\x3Cdiv class="error-card"\x3E\x3Ch4>' + safeT('scanFailed') + '\x3C/h4\x3E\x3Cp>' + safeT('scanAborted') + '\x3C/p\x3E\x3C/div>';
     });
 }
 
@@ -694,7 +729,7 @@ function startProgressPolling() {
     
     progressPollInterval = setInterval(function() {
         var scanIdParam = currentScanId ? '?scanId=' + encodeURIComponent(currentScanId) : '';
-        fetch('/api/progress' + scanIdParam)
+        fetch(API_BASE + '/api/progress' + scanIdParam)
             .then(function(response) { return response.json(); })
             .then(function(data) {
                 if (data.isScanning) {
@@ -738,7 +773,7 @@ function startTerminalPolling() {
     terminalPollInterval = setInterval(function() {
         if (!currentScanId) return;
         
-        fetch('/api/events?scanId=' + encodeURIComponent(currentScanId) + '&since=' + lastEventIndex)
+        fetch(API_BASE + '/api/events?scanId=' + encodeURIComponent(currentScanId) + '&since=' + lastEventIndex)
             .then(function(response) { return response.json(); })
             .then(function(data) {
                 if (data.events && data.events.length > 0) {
@@ -822,7 +857,7 @@ function appendTerminalLine(event) {
     var line = document.createElement('div');
     line.className = 'terminal-line ' + event.type + ' entering';
     
-    var timestamp = new Date(event.timestamp || Date.now()).toLocaleTimeString('en-US', { 
+    var timestamp = new Date(event.timestamp || Date.now()).toLocaleTimeString(languageSelector.currentLang === 'ja' ? 'ja-JP' : languageSelector.currentLang === 'zh' ? 'zh-CN' : languageSelector.currentLang === 'zh-TW' ? 'zh-TW' : languageSelector.currentLang === 'ko' ? 'ko-KR' : languageSelector.currentLang === 'ms' ? 'ms-MY' : 'en-US', { 
         hour12: false,
         hour: '2-digit',
         minute: '2-digit',
@@ -839,10 +874,12 @@ function appendTerminalLine(event) {
         'system': 'system'
     };
     var prefixKey = prefixMap[event.type] || 'scan';
-    var prefixText = languageSelector.t(prefixKey);
+    var prefixText = safeT(prefixKey);
     var prefix = '[' + prefixText + ']';
     
     line.textContent = '[' + timestamp + '] ' + prefix + ' ' + event.message;
+    line.setAttribute('data-event-type', event.type);
+    line.setAttribute('data-event-message', event.message || '');
     terminalOutput.appendChild(line);
     
     // Remove 'entering' class after animation completes so smooth depth transitions take over
@@ -863,9 +900,9 @@ function appendTerminalLine(event) {
     if (event.type === 'scan') {
         terminalStatus.textContent = event.message;
     } else if (event.type === 'complete') {
-        terminalStatus.textContent = languageSelector.t('terminalComplete');
+        terminalStatus.textContent = safeT('terminalComplete');
     } else if (event.type === 'error') {
-        terminalStatus.textContent = languageSelector.t('terminalError') + event.message;
+        terminalStatus.textContent = safeT('terminalError') + event.message;
     }
 }
 
@@ -875,7 +912,7 @@ function pollForResult() {
     resultPollTimeout = setTimeout(function checkResult() {
         if (!currentScanId) return;
         
-        fetch('/api/result?scanId=' + encodeURIComponent(currentScanId))
+        fetch(API_BASE + '/api/result?scanId=' + encodeURIComponent(currentScanId))
             .then(function(response) { return response.json(); })
             .then(function(result) {
                 console.log('[pollForResult] result:', result);
@@ -946,7 +983,7 @@ function setErrorState(message) {
     reportWarningCount.textContent = '0';
     reportPassedCount.textContent = '0';
 
-    reportIssuesList.innerHTML = '\x3Cdiv class="error-card">\x3Ch4>' + languageSelector.t('scanFailed') + '\x3C/h4>\x3Cp>' + escapeHtml(message) + '\x3C/p>\x3C/div>';
+    reportIssuesList.innerHTML = '\x3Cdiv class="error-card">\x3Ch4>' + safeT('scanFailed') + '\x3C/h4>\x3Cp>' + escapeHtml(message) + '\x3C/p>\x3C/div>';
 }
 
 function displayResults(result) {
@@ -1207,36 +1244,49 @@ function resetToIdle() {
 }
 
 var retranslateTerminal = function() {
-    if (!terminalOutput) return;
+    if (!terminalOutput || !languageSelector) return;
     var lines = terminalOutput.querySelectorAll('.terminal-line');
     for (var i = 0; i < lines.length; i++) {
-        var text = lines[i].textContent;
-        var match = text.match(/^\[([^\]]+)\]\s+\[([^\]]+)\]\s+(.+)$/);
-        if (match) {
-            var timestamp = match[1];
-            var oldPrefix = match[2];
-            var message = match[3];
-            var prefixMap = {
-                'CRAWL': 'crawl',
-                'SCAN': 'scan',
-                'CHECK': 'check',
-                'ISSUE': 'issue',
-                'COMPLETE': 'terminalComplete',
-                'ERROR': 'terminalError',
-                'SYSTEM': 'system'
-            };
-            var prefixKey = prefixMap[oldPrefix] || 'scan';
-            var newPrefix = '[' + languageSelector.t(prefixKey) + ']';
-            lines[i].textContent = '[' + timestamp + '] ' + newPrefix + ' ' + message;
+        var eventType = lines[i].getAttribute('data-event-type');
+        var eventMessage = lines[i].getAttribute('data-event-message');
+        if (!eventType) continue;
+        
+        var prefixMap = {
+            'crawl': 'crawl',
+            'scan': 'scan',
+            'check': 'check',
+            'issue': 'issue',
+            'complete': 'terminalComplete',
+            'error': 'terminalError',
+            'system': 'system'
+        };
+        var prefixKey = prefixMap[eventType] || 'scan';
+        var newPrefix = languageSelector.t(prefixKey);
+        
+        var timestamp = new Date().toLocaleTimeString(languageSelector.currentLang === 'ja' ? 'ja-JP' : languageSelector.currentLang === 'zh' ? 'zh-CN' : languageSelector.currentLang === 'zh-TW' ? 'zh-TW' : languageSelector.currentLang === 'ko' ? 'ko-KR' : languageSelector.currentLang === 'ms' ? 'ms-MY' : 'en-US', {
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        
+        var existingMatch = lines[i].textContent.match(/^\[([^\]]+)\]/);
+        if (existingMatch) {
+            var existingTimestamp = existingMatch[1];
+            lines[i].textContent = '[' + existingTimestamp + '] [' + newPrefix + '] ' + (eventMessage || '');
+        } else {
+            lines[i].textContent = '[' + newPrefix + '] ' + (eventMessage || '');
         }
     }
     if (terminalStatus) {
         var statusText = terminalStatus.textContent;
+        var completeText = languageSelector.t('terminalComplete');
+        var errorText = languageSelector.t('terminalError');
         if (statusText === 'Complete!') {
-            terminalStatus.textContent = languageSelector.t('terminalComplete');
-        } else if (statusText.indexOf('Error: ') === 0) {
-            var errMsg = statusText.substring(7);
-            terminalStatus.textContent = languageSelector.t('terminalError') + errMsg;
+            terminalStatus.textContent = completeText;
+        } else if (statusText.indexOf(errorText) === 0) {
+            var errMsg = statusText.substring(errorText.length);
+            terminalStatus.textContent = errorText + errMsg;
         }
     }
 };

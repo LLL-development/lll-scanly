@@ -17,7 +17,52 @@ const MIME_TYPES: Record<string, string> = {
   '.webp': 'image/webp',
 };
 
+const ALLOWED_ORIGINS = [
+  'https://lll-scanly.pages.dev',
+  'http://localhost:3000',
+  'http://localhost:5173',
+];
+
+function isAllowedOrigin(origin: string): boolean {
+  if (!origin) return true;
+  return ALLOWED_ORIGINS.some(allowed => {
+    try {
+      const allowedUrl = new URL(allowed);
+      const originUrl = new URL(origin);
+      if (originUrl.host === allowedUrl.host && originUrl.protocol === allowedUrl.protocol) {
+        return true;
+      }
+      // Allow Cloudflare Pages preview URLs: <branch>--<project>.pages.dev
+      if (allowedUrl.host === 'lll-scanly.pages.dev') {
+        const previewPattern = /^[^-]+-lll-scanly\.pages\.dev$/;
+        return previewPattern.test(originUrl.host);
+      }
+      // Allow Render URLs: <name>-<user>.onrender.com
+      if (allowedUrl.host === 'scanly-api.onrender.com') {
+        const renderPattern = /^scanly-api-[a-z0-9-]+\.onrender\.com$/;
+        return renderPattern.test(originUrl.host);
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  });
+}
+
 const server = createServer(async (req, res) => {
+  const origin = req.headers.origin || '';
+  if (isAllowedOrigin(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
   const url = new URL(req.url!, `http://${req.headers.host}`);
 
   // API routes
@@ -164,8 +209,10 @@ const server = createServer(async (req, res) => {
   }
 });
 
-server.listen(4000, () => {
-  console.log('\n  Scanly UI running at http://localhost:4000\n');
+const PORT = parseInt(process.env.PORT || '4000', 10);
+
+server.listen(PORT, () => {
+  console.log(`\n  Scanly API running on port ${PORT}\n`);
 });
 
 process.on('SIGINT', () => {
