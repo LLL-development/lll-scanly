@@ -11,62 +11,28 @@ function formatCsvRow(fields: string[]): string {
   return fields.map(escapeCsvField).join(',');
 }
 
-function escapeTsvField(value: string): string {
-  const needsQuotes = value.includes('\t') || value.includes('"') || value.includes('\n') || value.includes('\r');
-  if (!needsQuotes) return value;
-  return '"' + value.replace(/"/g, '""') + '"';
-}
-
-function formatTsvRow(fields: string[]): string {
-  return fields.map(escapeTsvField).join('\t');
-}
-
 export function reportCsv(result: ScanResult, lang = 'en'): string {
-  const isMultiPage = result.pages && result.pages.length > 1;
+  const lines: string[] = [];
 
-  if (isMultiPage) {
-    return reportCsvMultiPage(result, lang);
-  }
+  // Summary section
+  lines.push('LLL-Scanly Report');
+  lines.push('');
+  lines.push('URL,' + result.url);
+  lines.push('Scan Date,' + new Date().toISOString());
+  lines.push('Scan Mode,' + (result.scanMode || 'Quick Scan'));
+  lines.push('Pages Scanned,' + result.pagesScanned);
+  lines.push('');
+  lines.push('Summary');
+  lines.push('Total,Errors,Warnings,Info');
+  lines.push(result.summary.total + ',' + result.summary.errors + ',' + result.summary.warnings + ',' + result.summary.info);
+  lines.push('');
+  lines.push('Issues');
+  lines.push('Severity,Type,Message,Element,URL,Suggestion');
 
-  const header = 'Severity,Type,Message,Element,URL,Suggestion';
-  const rows = result.issues.map(issue => {
-    return formatCsvRow([
-      issue.severity,
-      issue.type,
-      translateMessage(lang, issue.type, issue.message),
-      issue.element || '',
-      issue.url,
-      translateSuggestion(lang, issue.suggestion || ''),
-    ]);
-  });
-
-  return [header, ...rows].join('\n');
-}
-
-function reportCsvMultiPage(result: ScanResult, lang: string): string {
-  const tsvParts: string[] = [];
-
-  // Sheet 1: All issues combined
-  tsvParts.push('\x00All Issues');
-  tsvParts.push(formatTsvRow(['Severity', 'Type', 'Message', 'Element', 'URL', 'Suggestion']));
-  for (const issue of result.issues) {
-    tsvParts.push(formatTsvRow([
-      issue.severity,
-      issue.type,
-      translateMessage(lang, issue.type, issue.message),
-      issue.element || '',
-      issue.url,
-      translateSuggestion(lang, issue.suggestion || ''),
-    ]));
-  }
-
-  // Sheet 2+: One sheet per page
-  for (let i = 0; i < result.pages.length; i++) {
-    const page = result.pages[i];
-    tsvParts.push(`\x00Page ${i + 1}`);
-    tsvParts.push(formatTsvRow(['Severity', 'Type', 'Message', 'Element', 'URL', 'Suggestion']));
-    for (const issue of page.issues) {
-      tsvParts.push(formatTsvRow([
+  // Single page or combined issues
+  if (!result.pages || result.pages.length <= 1) {
+    for (const issue of result.issues) {
+      lines.push(formatCsvRow([
         issue.severity,
         issue.type,
         translateMessage(lang, issue.type, issue.message),
@@ -75,7 +41,21 @@ function reportCsvMultiPage(result: ScanResult, lang: string): string {
         translateSuggestion(lang, issue.suggestion || ''),
       ]));
     }
+  } else {
+    // Multi-page: include Page URL column
+    for (const page of result.pages) {
+      for (const issue of page.issues) {
+        lines.push(formatCsvRow([
+          issue.severity,
+          issue.type,
+          translateMessage(lang, issue.type, issue.message),
+          issue.element || '',
+          page.url,
+          translateSuggestion(lang, issue.suggestion || ''),
+        ]));
+      }
+    }
   }
 
-  return tsvParts.join('\n');
+  return lines.join('\n');
 }

@@ -1,0 +1,13 @@
+[pages]
+production_branch = "main"
+
+[pages.build]
+command = "node scripts/inject-api-base.js"
+output_dir = "."
+
+[pages.env]
+SCANLY_API_BASE = ""
+
+[[redirects]]
+from = "/*"
+status = 200

@@ -1808,6 +1808,10 @@ body {
 }
 
 @media (max-width: 640px) {
+    .scene {
+        justify-content: flex-end;
+        padding-bottom: 5vh;
+    }
     .splash h1 {
         font-size: 3rem;
     }
@@ -1837,7 +1841,7 @@ body {
     /* Input */
     .input-surface {
         flex-direction: row;
-        padding: 15px;
+        padding: 12px 15px;
         width: 95vw;
     }
     .input-wrapper {
@@ -1856,7 +1860,7 @@ body {
     /* Monster */
     .monster-container {
         width: 90vw;
-        bottom: -30px;
+        bottom: -60px;
     }
 
     /* Progress bar */
@@ -1867,6 +1871,7 @@ body {
     /* Scan mode selector */
     .scan-mode-selector {
         width: 95vw;
+        margin-bottom: 10px;
     }
     .scan-mode-options {
         gap: 4px;
