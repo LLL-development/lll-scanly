@@ -1,5 +1,5 @@
 // ===== API CONFIGURATION =====
-var API_BASE = window.SCANLY_API_BASE || '';
+var API_BASE = 'https://lll-scanly-api.onrender.com';
 
 // ===== LANGUAGE SELECTOR =====
 var languageSelector = null;
