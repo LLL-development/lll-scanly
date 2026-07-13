@@ -83,7 +83,7 @@ const server = createServer(async (req, res) => {
 
     if (api.isBusy()) {
       res.writeHead(429, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Server is busy. Please try again in a moment.' }));
+      res.end(JSON.stringify({ error: 'Our Scanner is currently busy! We\'re checking other websites at the moment. Please come back in a little while and try again.' }));
       return;
     }
 

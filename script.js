@@ -320,6 +320,9 @@ const terminalStatus = document.getElementById('terminalStatus');
 const terminalLoading = document.getElementById('terminalLoading');
 const closeTerminal = document.getElementById('closeTerminal');
 
+var progressAnimFrame = null;
+var progressAnimActive = false;
+
 // Report view refs
 const reportView = document.getElementById('reportView');
 const reportDocument = document.getElementById('reportDocument');
@@ -610,18 +613,28 @@ function startScan() {
             scanMode: scanMode
         }),
     })
-    .then(function(response) { 
+    .then(async function(response) { 
+        console.log('[scan fetch] status:', response.status);
         if (response.status === 429) {
-            return response.json().then(function(err) { throw new Error('busy:' + (err.error || 'Server busy')); });
+            console.log('[scan fetch] 429 detected');
+            try {
+                await response.json();
+                showBusyModal(safeT('serverBusy'));
+            } catch(e) {
+                console.log('[scan fetch] json parse failed:', e);
+                showBusyModal(safeT('serverBusy'));
+            }
+            return null;
         }
-        return response.json(); 
+        var data = await response.json();
+        if (data.error) {
+            setErrorState(data.error);
+            return null;
+        }
+        return data;
     })
     .then(function(result) {
-        if (result.error) {
-            setErrorState(result.error);
-            return;
-        }
-
+        if (!result) return;
         currentScanId = result.scanId;
         startProgressPolling();
         startTerminalPolling();
@@ -630,10 +643,6 @@ function startScan() {
     .catch(function(err) {
         if (err.message === 'Scan aborted by user') {
             resetToIdle();
-            return;
-        }
-        if (err.message.startsWith('busy:')) {
-            setErrorState(err.message.replace('busy:', ''));
             return;
         }
         setErrorState(safeT('connectError'));
@@ -717,24 +726,23 @@ function setScanningState(scanning) {
 // Loading phrases and thought icons removed per user request
 
 function startProgressPolling() {
-    var animFrame = null;
     var startTime = Date.now();
     var animDuration = 20000;
-    var animationActive = true;
     var lastRealProgress = 0;
     var scanDone = false;
+    progressAnimActive = true;
     
     function animateProgress() {
-        if (!animationActive || scanDone) return;
+        if (!progressAnimActive || scanDone) return;
         var elapsed = Date.now() - startTime;
         var progress = Math.min((elapsed / animDuration) * 100, 95);
         progressFill.style.width = progress + '%';
         
-        if (progress < 95 && animationActive && !scanDone) {
-            animFrame = requestAnimationFrame(animateProgress);
+        if (progress < 95 && progressAnimActive && !scanDone) {
+            progressAnimFrame = requestAnimationFrame(animateProgress);
         }
     }
-    animFrame = requestAnimationFrame(animateProgress);
+    progressAnimFrame = requestAnimationFrame(animateProgress);
     
     progressPollInterval = setInterval(function() {
         var scanIdParam = currentScanId ? '?scanId=' + encodeURIComponent(currentScanId) : '';
@@ -742,12 +750,12 @@ function startProgressPolling() {
             .then(function(response) { return response.json(); })
             .then(function(data) {
                 if (data.isScanning) {
-                    if (animationActive && data.progress > 0) {
-                        animationActive = false;
-                        if (animFrame) cancelAnimationFrame(animFrame);
+                    if (progressAnimActive && data.progress > 0) {
+                        progressAnimActive = false;
+                        if (progressAnimFrame) cancelAnimationFrame(progressAnimFrame);
                         progressFill.style.width = data.progress + '%';
                         lastRealProgress = data.progress;
-                    } else if (!animationActive) {
+                    } else if (!progressAnimActive) {
                         if (data.progress > lastRealProgress) {
                             lastRealProgress = data.progress;
                             progressFill.style.width = data.progress + '%';
@@ -776,6 +784,11 @@ function stopProgressPolling() {
         clearInterval(progressPollInterval);
         progressPollInterval = null;
     }
+    if (progressAnimFrame) {
+        cancelAnimationFrame(progressAnimFrame);
+        progressAnimFrame = null;
+    }
+    progressAnimActive = false;
 }
 
 function startTerminalPolling() {
@@ -993,6 +1006,60 @@ function setErrorState(message) {
     reportPassedCount.textContent = '0';
 
     reportIssuesList.innerHTML = '\x3Cdiv class="error-card">\x3Ch4>' + safeT('scanFailed') + '\x3C/h4>\x3Cp>' + escapeHtml(message) + '\x3C/p>\x3C/div>';
+}
+
+function showBusyModal(message) {
+    console.log('[showBusyModal] called with:', message);
+    var busyOverlay = document.getElementById('busyOverlay');
+    var busyMessage = document.getElementById('busyMessage');
+    var busyClose = document.getElementById('busyClose');
+    var terminalView = document.getElementById('terminalView');
+    var mainInterface = document.getElementById('mainInterface');
+    console.log('[showBusyModal] overlay:', !!busyOverlay, 'message:', !!busyMessage);
+    if (!busyOverlay || !busyMessage) return;
+    busyMessage.textContent = message;
+    if (terminalView) {
+        terminalView.style.display = 'none';
+    }
+    busyOverlay.style.display = 'flex';
+    function restoreView() {
+        busyOverlay.style.display = 'none';
+        if (terminalView) {
+            terminalView.style.display = 'none';
+        }
+        if (mainInterface) {
+            mainInterface.style.display = 'flex';
+        }
+        stopProgressPolling();
+        stopTerminalPolling();
+        progressFill.style.width = '0%';
+        var progressBar = document.getElementById('progressBar');
+        if (progressBar) {
+            progressBar.classList.remove('visible');
+        }
+        if (scanBtn) {
+            scanBtn.style.display = 'inline-block';
+            scanBtn.disabled = false;
+        }
+        if (stopBtn) stopBtn.style.display = 'none';
+        if (urlInput) {
+            urlInput.disabled = false;
+            urlInput.value = '';
+        }
+        currentScanId = null;
+        lastEventIndex = 0;
+        if (mainInterface) {
+            mainInterface.classList.add('active');
+        }
+    }
+    if (busyClose) {
+        busyClose.onclick = restoreView;
+    }
+    busyOverlay.onclick = function(e) {
+        if (e.target === busyOverlay) {
+            restoreView();
+        }
+    };
 }
 
 function displayResults(result) {
