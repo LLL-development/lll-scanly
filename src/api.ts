@@ -16,6 +16,7 @@ interface ScanSession {
   abortController: AbortController | null;
   scanMode?: string;
   pagesScanned?: number;
+  lastActive: number;
 }
 
 let scanCounter = 0;
@@ -28,7 +29,8 @@ function generateScanId(): string {
 const api = {
   port: 4000,
   sessions: new Map<string, ScanSession>(),
-  maxConcurrentScans: 5,
+  maxConcurrentScans: 2,
+  maxEventsPerSession: 500,
 
   async scan(url: string, maxPages: number = 1, timeout: number = 60000, maxDepth: number = 5, scanMode?: string) {
     const scanId = generateScanId();
@@ -49,7 +51,8 @@ const api = {
       },
       events: [],
       abortController,
-      scanMode
+      scanMode,
+      lastActive: Date.now()
     };
 
     this.sessions.set(scanId, session);
@@ -67,7 +70,11 @@ const api = {
 
     scanner.onEvent((event: ScanEvent) => {
       if (this.sessions.has(scanId)) {
-        this.sessions.get(scanId)!.events.push(event);
+        const session = this.sessions.get(scanId)!;
+        session.events.push(event);
+        if (session.events.length > this.maxEventsPerSession) {
+          session.events = session.events.slice(-this.maxEventsPerSession);
+        }
       }
     });
 
@@ -120,6 +127,7 @@ const api = {
     if (!session) {
       return { isScanning: false, currentChecker: '', progress: 0, message: '', scanId };
     }
+    session.lastActive = Date.now();
     return { ...session.currentProgress, scanId };
   },
 
@@ -146,6 +154,7 @@ const api = {
     if (!session) {
       return [];
     }
+    session.lastActive = Date.now();
     return session.events.slice(since);
   },
 
@@ -183,5 +192,20 @@ const api = {
     return completed;
   }
 };
+
+const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, session] of api.sessions) {
+    if (!session.isScanning && (now - session.lastActive) > IDLE_TIMEOUT_MS) {
+      session.abortController?.abort();
+      session.scanner.stop().catch(() => {});
+      api.sessions.delete(id);
+      console.log(`[API] Cleaned up idle scan: ${id}`);
+    }
+  }
+  api.cleanupCompleted();
+}, 60000);
 
 export default api;

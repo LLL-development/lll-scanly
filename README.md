@@ -30,6 +30,8 @@ npm install
 | `npm run start` | Run CLI via `tsx src/index.ts` |
 | `npm run scan` | Alias for `start` |
 | `npm run ui` | Run the web UI server on port 4000 |
+| `npm run build:ui` | Inject API base URL into frontend files |
+| `npm run dev:ui` | Inject empty API base and start server (local dev) |
 
 ## Usage
 
@@ -55,10 +57,16 @@ npx tsx src/index.ts -c scanly.config.json
 Run the interactive web UI on localhost:
 
 ```bash
-npm run ui
+# Local development (injects empty API base for localhost)
+npm run dev:ui
+
+# Or manually:
+npm run build:ui && npm run ui
 ```
 
 The UI will be available at `http://localhost:4000`.
+
+> **Note:** For local development, `npm run dev:ui` injects an empty API base so the frontend connects to the local server. For production deployment, the API base is injected via environment variables during the build process (see `wrangler.toml` for Cloudflare Pages, or set `SCANLY_API_BASE` for other hosts).
 
 ### Features
 
@@ -78,11 +86,15 @@ The UI will be available at `http://localhost:4000`.
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/api/scan` | POST | Start a scan. Body: `{ scanUrl, maxPages, timeout }` |
+| `/api/scan` | POST | Start a scan. Body: `{ scanUrl, maxPages, timeout, maxDepth, scanMode }` |
 | `/api/status` | GET | Returns `{ scanning: boolean }` |
 | `/api/result` | GET | Returns the last scan result |
 | `/api/progress` | GET | Returns `{ isScanning, currentChecker, progress, message }` |
+| `/api/events` | GET | Returns real-time scan events. Query: `?scanId=&since=` |
 | `/api/stop` | POST | Stops the current scan |
+| `/api/download` | GET | Download report. Query: `?format=&scanId=&lang=` |
+
+> **Concurrency Limit:** Maximum 2 concurrent scans. Excess requests receive a `429` response.
 
 ## CLI Options
 

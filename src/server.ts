@@ -39,8 +39,8 @@ function isAllowedOrigin(origin: string): boolean {
         return previewPattern.test(originUrl.host);
       }
       // Allow Render URLs: <name>-<user>.onrender.com
-      if (allowedUrl.host === 'scanly-api.onrender.com') {
-        const renderPattern = /^scanly-api-[a-z0-9-]+\.onrender\.com$/;
+      if (allowedUrl.host === 'lll-scanly-api.onrender.com') {
+        const renderPattern = /^lll-scanly-api-[a-z0-9-]+\.onrender\.com$/;
         return renderPattern.test(originUrl.host);
       }
       return false;
@@ -78,6 +78,12 @@ const server = createServer(async (req, res) => {
     if (!scanUrl) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'URL is required' }));
+      return;
+    }
+
+    if (api.isBusy()) {
+      res.writeHead(429, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Server is busy. Please try again in a moment.' }));
       return;
     }
 

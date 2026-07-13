@@ -1,5 +1,5 @@
 // ===== API CONFIGURATION =====
-var API_BASE = 'https://lll-scanly-api.onrender.com';
+var API_BASE = '';
 
 // ===== LANGUAGE SELECTOR =====
 var languageSelector = null;
@@ -610,7 +610,12 @@ function startScan() {
             scanMode: scanMode
         }),
     })
-    .then(function(response) { return response.json(); })
+    .then(function(response) { 
+        if (response.status === 429) {
+            return response.json().then(function(err) { throw new Error('busy:' + (err.error || 'Server busy')); });
+        }
+        return response.json(); 
+    })
     .then(function(result) {
         if (result.error) {
             setErrorState(result.error);
@@ -625,6 +630,10 @@ function startScan() {
     .catch(function(err) {
         if (err.message === 'Scan aborted by user') {
             resetToIdle();
+            return;
+        }
+        if (err.message.startsWith('busy:')) {
+            setErrorState(err.message.replace('busy:', ''));
             return;
         }
         setErrorState(safeT('connectError'));
