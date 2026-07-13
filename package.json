@@ -8,7 +8,9 @@
     "build": "tsc",
     "start": "tsx src/index.ts",
     "scan": "tsx src/index.ts",
-    "ui": "tsx src/server.ts"
+    "ui": "tsx src/server.ts",
+    "build:ui": "node scripts/inject-api-base.js",
+    "dev:ui": "node -e \"process.env.SCANLY_API_BASE=''; require('./scripts/inject-api-base.js')\" && tsx src/server.ts"
   },
   "bin": {
     "scanly": "./dist/index.js"

@@ -2126,3 +2126,58 @@ body {
     left: -16px;
     color: #999;
 }
+
+.busy-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+}
+
+.busy-modal {
+    background: #fcfcfc;
+    border: 2px solid #1a1a1a;
+    border-radius: 12px;
+    padding: 40px;
+    max-width: 480px;
+    width: 90vw;
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+    text-align: center;
+}
+
+.busy-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    color: #666;
+    transition: color 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.busy-close:hover {
+    color: #1a1a1a;
+}
+
+.busy-icon {
+    font-size: 20px;
+    margin-bottom: 16px;
+}
+
+.busy-modal p {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #333;
+    white-space: pre-line;
+}
