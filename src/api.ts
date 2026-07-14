@@ -200,7 +200,7 @@ setInterval(() => {
   for (const [id, session] of api.sessions) {
     if (!session.isScanning && (now - session.lastActive) > IDLE_TIMEOUT_MS) {
       session.abortController?.abort();
-      try { await session.scanner.stop(); } catch (e) { /* ignore */ }
+      session.scanner?.stop();
       api.sessions.delete(id);
       console.log(`[API] Cleaned up idle scan: ${id}`);
     }
