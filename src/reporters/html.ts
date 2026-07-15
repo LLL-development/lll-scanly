@@ -485,15 +485,15 @@ export function reportHtml(result: ScanResult, lang = 'en'): string {
     .status-banner { text-align: center; padding: 6px 20mm; font-size: 0.8rem; font-weight: 600; }
     .content { padding: 6mm 20mm 10mm 20mm; }
     .section-title { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #111; margin-bottom: 6px; padding-top: 6px; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 8mm; font-size: 0.75rem; }
-    thead th { background: #f9fafb; padding: 8px 10px; text-align: left; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; color: #374151; border-bottom: 2px solid #e5e5e5; font-weight: 600; }
-    thead th:nth-child(1) { width: 10%; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 8mm; font-size: 0.75rem; table-layout: fixed; }
+    thead th { background: #f9fafb; padding: 8px 10px; text-align: left; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; color: #374151; border-bottom: 2px solid #e5e5e5; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+    thead th:nth-child(1) { width: 8%; }
     thead th:nth-child(2) { width: 12%; }
-    thead th:nth-child(3) { width: 25%; }
-    thead th:nth-child(4) { width: 15%; }
-    thead th:nth-child(5) { width: 18%; }
-    thead th:nth-child(6) { width: 20%; }
-    tbody td { padding: 8px 10px; border-top: 1px solid #f3f4f6; vertical-align: top; }
+    thead th:nth-child(3) { width: 16%; }
+    thead th:nth-child(4) { width: 20%; }
+    thead th:nth-child(5) { width: 28%; }
+    thead th:nth-child(6) { width: 16%; }
+    tbody td { padding: 8px 10px; border-top: 1px solid #f3f4f6; vertical-align: top; overflow: hidden; text-overflow: ellipsis; }
     tbody tr.issue-row.error { border-left: 2px solid #dc2626; }
     tbody tr.issue-row.warning { border-left: 2px solid #d97706; }
     tbody tr.issue-row.info { border-left: 2px solid #06b6d4; }
@@ -502,10 +502,10 @@ export function reportHtml(result: ScanResult, lang = 'en'): string {
     .badge-warning { background: #fffbeb; color: #d97706; }
     .badge-info { background: #ecfeff; color: #0284c7; }
     .issue-type { color: #6b7280; font-family: monospace; font-size: 0.7rem; }
-    .issue-element { font-family: monospace; font-size: 0.68rem; color: #6b7280; word-break: break-all; }
-    .issue-url { color: #2563eb; word-break: break-all; font-size: 0.7rem; }
+    .issue-element { font-family: monospace; font-size: 0.68rem; color: #6b7280; word-break: break-word; overflow-wrap: break-word; }
+    .issue-url { color: #2563eb; word-break: break-word; overflow-wrap: break-word; }
     .issue-suggestion { color: #16a34a; font-size: 0.7rem; }
-    .error-msg { color: #dc2626; word-break: break-all; font-size: 0.7rem; }
+    .error-msg { color: #dc2626; word-break: break-word; overflow-wrap: break-word; font-size: 0.7rem; }
     .no-issues { text-align: center; padding: 12mm 0; color: #16a34a; font-size: 0.85rem; font-weight: 500; }
     .report-footer { position: absolute; bottom: 0; left: 0; right: 0; padding: 6mm 20mm; border-top: 1px solid #e5e5e5; display: flex; justify-content: space-between; align-items: center; }
     .report-footer .footer-left { font-size: 0.65rem; color: #aaa; letter-spacing: 0.5px; }

@@ -52,11 +52,10 @@ function isAllowedOrigin(origin: string): boolean {
 
 const server = createServer(async (req, res) => {
   const origin = req.headers.origin || '';
-  if (isAllowedOrigin(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, DELETE');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Max-Age', '86400');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -192,6 +191,13 @@ const server = createServer(async (req, res) => {
       res.end(JSON.stringify({ error: `Failed to generate ${format} report: ${err instanceof Error ? err.message : String(err)}` }));
       return;
     }
+  }
+
+  // Health check / keepalive endpoint
+  if (url.pathname === '/api/health' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok' }));
+    return;
   }
 
   // Serve static files

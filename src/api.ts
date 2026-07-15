@@ -33,6 +33,9 @@ const api = {
   maxEventsPerSession: 500,
 
   async scan(url: string, maxPages: number = 1, timeout: number = 60000, maxDepth: number = 5, scanMode?: string) {
+    // Clean up any completed sessions before starting a new scan
+    this.cleanupCompleted();
+
     const scanId = generateScanId();
     const modeLabel = scanMode === 'deep' ? 'Deep Scan' : scanMode === 'custom' ? 'Custom Scan' : 'Quick Scan';
     const scanner = new Scanner({ scanMode: modeLabel } as any);
@@ -107,6 +110,11 @@ const api = {
         if (this.sessions.has(scanId)) {
           this.sessions.get(scanId)!.isScanning = false;
         }
+        // Clean up session after scan completes (success, failure, or abort)
+        // Give frontend 2s to fetch the result before cleanup
+        setTimeout(() => {
+          this.sessions.delete(scanId);
+        }, 2000);
       }
     })();
 
@@ -176,6 +184,8 @@ const api = {
     } catch (err) {
       // Scanner may not support stop, that's ok
     }
+    // Clean up immediately after stopping
+    this.sessions.delete(scanId);
     return { stopped: true, scanId };
   },
 

@@ -1,5 +1,10 @@
 // ===== API CONFIGURATION =====
-var API_BASE = 'https://lll-scanly-api.onrender.com';
+var API_BASE = '';
+
+// ===== KEEPALIVE =====
+var keepaliveInterval = setInterval(function() {
+    fetch(API_BASE + '/api/health').catch(function() { /* ignore */ });
+}, 240000);
 
 // ===== LANGUAGE SELECTOR =====
 var languageSelector = null;
@@ -292,6 +297,7 @@ splash.addEventListener('click', function() {
         
         setTimeout(function() {
             mainInterface.classList.add('active');
+            if (scanModeIndicator) scanModeIndicator.style.display = 'flex';
             
             setTimeout(function() {
                 startTypewriter();
@@ -312,8 +318,7 @@ const pupils = document.getElementById('pupils');
 const loadingState = document.getElementById('loadingState');
 const progressBar = document.getElementById('progressBar');
 const progressFill = document.getElementById('progressFill');
-const scanModeSelector = document.getElementById('scanModeSelector');
-const customScanSettings = document.getElementById('customScanSettings');
+const scanModeIndicator = document.getElementById('scanModeIndicator');
 const terminalView = document.getElementById('terminalView');
 const terminalOutput = document.getElementById('terminalOutput');
 const terminalStatus = document.getElementById('terminalStatus');
@@ -396,41 +401,8 @@ urlInput.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') startScan();
 });
 
-// Scan mode selector
-document.querySelectorAll('input[name="scanMode"]').forEach(radio => {
-    radio.addEventListener('change', function() {
-        if (this.value === 'custom') {
-            customScanSettings.style.display = 'flex';
-        } else {
-            customScanSettings.style.display = 'none';
-        }
-    });
-});
-
-var customMaxPagesInput = document.getElementById('customMaxPages');
-var customMaxDepthInput = document.getElementById('customMaxDepth');
-
-if (customMaxPagesInput) {
-    customMaxPagesInput.addEventListener('input', function() {
-        var val = parseInt(this.value, 10);
-        if (val > 50) {
-            this.value = 50;
-        } else if (val < 1 && this.value !== '') {
-            this.value = 1;
-        }
-    });
-}
-
-if (customMaxDepthInput) {
-    customMaxDepthInput.addEventListener('input', function() {
-        var val = parseInt(this.value, 10);
-        if (val > 5) {
-            this.value = 5;
-        } else if (val < 1 && this.value !== '') {
-            this.value = 1;
-        }
-    });
-}
+// Scan mode selector - only Quick Scan is available
+// Deep Scan and Custom Scan are disabled for this deployment
 
 // Terminal stop button
 var terminalStopBtn = document.getElementById('terminalStopBtn');
@@ -487,38 +459,44 @@ downloadBtn.addEventListener('click', function() {
     
     var format = downloadFormat.value;
     var lang = languageSelector.currentLang || 'en';
-    var downloadUrl = API_BASE + '/api/download?format=' + format + '&scanId=' + encodeURIComponent(currentScanId) + '&lang=' + encodeURIComponent(lang);
-    console.log('[download] Fetching:', downloadUrl);
     
-    fetch(downloadUrl)
-        .then(function(response) {
-            console.log('[download] Response status:', response.status);
-            if (!response.ok) {
-                return response.text().then(function(text) {
-                    throw new Error('HTTP ' + response.status + ': ' + text);
-                });
-            }
-            return response.blob();
-        })
-        .then(function(blob) {
-            console.log('[download] Blob size:', blob.size);
-            var url = window.URL.createObjectURL(blob);
-            var a = document.createElement('a');
-            a.href = url;
-            a.download = 'scanly-report-' + currentScanId + '.' + (format === 'pdf' ? 'pdf' : 'csv');
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-        })
-        .catch(function(err) {
-            console.error('[download] Failed:', err);
-            alert('Download failed: ' + err.message);
-        })
-        .finally(function() {
-            downloadBtn.disabled = false;
-            downloadBtn.textContent = safeT('downloadReport') || 'Download Report';
-        });
+    if (format === 'csv') {
+        var downloadUrl = API_BASE + '/api/download?format=csv&scanId=' + encodeURIComponent(currentScanId) + '&lang=' + encodeURIComponent(lang);
+        console.log('[download] Fetching CSV:', downloadUrl);
+        
+        fetch(downloadUrl)
+            .then(function(response) {
+                console.log('[download] Response status:', response.status);
+                if (!response.ok) {
+                    return response.text().then(function(text) {
+                        throw new Error('HTTP ' + response.status + ': ' + text);
+                    });
+                }
+                return response.blob();
+            })
+            .then(function(blob) {
+                console.log('[download] Blob size:', blob.size);
+                var url = window.URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = 'scanly-report-' + currentScanId + '.csv';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            })
+            .catch(function(err) {
+                console.error('[download] Failed:', err);
+                alert('Download failed: ' + err.message);
+            })
+            .finally(function() {
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = safeT('downloadReport') || 'Download Report';
+            });
+    } else if (format === 'pdf') {
+        console.log('[download] Using client-side PDF generation');
+        downloadPdfClient();
+    }
 });
 
 window.addEventListener('beforeunload', function() {
@@ -567,26 +545,10 @@ function startScan() {
         return;
     }
 
-    // Get scan mode and settings
-    var scanModeInput = document.querySelector('input[name="scanMode"]:checked');
-    if (!scanModeInput) {
-        alert('Please select a scan mode (Quick Scan, Deep Scan, or Custom)');
-        return;
-    }
-    
-    var scanMode = scanModeInput.value;
+    // Only Quick Scan is available on this deployment
+    var scanMode = 'quick';
     var maxPages = 1;
     var maxDepth = 5;
-
-    if (scanMode === 'deep') {
-        maxPages = 20;
-        maxDepth = 3;
-    } else if (scanMode === 'custom') {
-        var pagesVal = parseInt(document.getElementById('customMaxPages').value, 10);
-        var depthVal = parseInt(document.getElementById('customMaxDepth').value, 10);
-        maxPages = (isNaN(pagesVal) || pagesVal < 1) ? 1 : Math.min(pagesVal, 50);
-        maxDepth = (isNaN(depthVal) || depthVal < 1) ? 1 : Math.min(depthVal, 5);
-    }
 
     console.log('Showing terminal view');
     setScanningState(true);
@@ -602,6 +564,10 @@ function startScan() {
     console.log('Main interface display:', mainInterface.style.display);
     console.log('Terminal view display:', terminalView.style.display);
 
+    var fetchTimeout = setTimeout(function() {
+        setErrorState('Server is sleeping, please try again...');
+    }, 45000);
+
     fetch(API_BASE + '/api/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -614,6 +580,7 @@ function startScan() {
         }),
     })
     .then(async function(response) { 
+        clearTimeout(fetchTimeout);
         console.log('[scan fetch] status:', response.status);
         if (response.status === 429) {
             console.log('[scan fetch] 429 detected');
@@ -634,6 +601,7 @@ function startScan() {
         return data;
     })
     .then(function(result) {
+        clearTimeout(fetchTimeout);
         if (!result) return;
         currentScanId = result.scanId;
         startProgressPolling();
@@ -641,6 +609,7 @@ function startScan() {
         pollForResult();
     })
     .catch(function(err) {
+        clearTimeout(fetchTimeout);
         if (err.message === 'Scan aborted by user') {
             resetToIdle();
             return;
@@ -650,12 +619,34 @@ function startScan() {
 }
 
 function stopScan() {
+    var stopTimeout = setTimeout(function() {
+        stopProgressPolling();
+        stopTerminalPolling();
+        progressFill.style.width = '100%';
+        loadingState.classList.remove('active');
+        terminalView.style.cssText = 'display: none !important; opacity: 0 !important;';
+        mainInterface.style.cssText = 'display: flex !important; animation: none !important;';
+        mainInterface.classList.add('active');
+        scanBtn.style.display = 'inline-block';
+        stopBtn.style.display = 'none';
+        urlInput.disabled = false;
+        showReportView();
+        scanAgainButton.style.display = 'inline-block';
+        if (terminalLoading) terminalLoading.style.display = 'none';
+        reportUrl.textContent = urlInput.value.trim();
+        reportErrorCount.textContent = '1';
+        reportWarningCount.textContent = '0';
+        reportPassedCount.textContent = '0';
+        reportIssuesList.innerHTML = '\x3Cdiv class="error-card"\x3E\x3Ch4>' + safeT('scanFailed') + '\x3C/h4\x3E\x3Cp>Stop request timed out, but scan may still be running. Please try again.</p\x3E\x3C/div>';
+    }, 10000);
+
     fetch(API_BASE + '/api/stop', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scanId: currentScanId }),
     })
     .then(function() {
+        clearTimeout(stopTimeout);
         stopProgressPolling();
         stopTerminalPolling();
         progressFill.style.width = '100%';
@@ -676,6 +667,7 @@ function stopScan() {
         reportIssuesList.innerHTML = '\x3Cdiv class="error-card"\x3E\x3Ch4>' + safeT('scanFailed') + '\x3C/h4\x3E\x3Cp>' + safeT('scanAborted') + '\x3C/p\x3E\x3C/div>';
     })
     .catch(function() {
+        clearTimeout(stopTimeout);
         stopProgressPolling();
         stopTerminalPolling();
         progressFill.style.width = '100%';
@@ -745,9 +737,11 @@ function startProgressPolling() {
     progressAnimFrame = requestAnimationFrame(animateProgress);
     
     progressPollInterval = setInterval(function() {
+        var controller = new AbortController();
+        var timer = setTimeout(function() { controller.abort(); }, 5000);
         var scanIdParam = currentScanId ? '?scanId=' + encodeURIComponent(currentScanId) : '';
-        fetch(API_BASE + '/api/progress' + scanIdParam)
-            .then(function(response) { return response.json(); })
+        fetch(API_BASE + '/api/progress' + scanIdParam, { signal: controller.signal })
+            .then(function(response) { clearTimeout(timer); return response.json(); })
             .then(function(data) {
                 if (data.isScanning) {
                     if (progressAnimActive && data.progress > 0) {
@@ -794,9 +788,11 @@ function stopProgressPolling() {
 function startTerminalPolling() {
     terminalPollInterval = setInterval(function() {
         if (!currentScanId) return;
+        var controller = new AbortController();
+        var timer = setTimeout(function() { controller.abort(); }, 5000);
         
-        fetch(API_BASE + '/api/events?scanId=' + encodeURIComponent(currentScanId) + '&since=' + lastEventIndex)
-            .then(function(response) { return response.json(); })
+        fetch(API_BASE + '/api/events?scanId=' + encodeURIComponent(currentScanId) + '&since=' + lastEventIndex, { signal: controller.signal })
+            .then(function(response) { clearTimeout(timer); return response.json(); })
             .then(function(data) {
                 if (data.events && data.events.length > 0) {
                     data.events.forEach(function(event) {
@@ -933,9 +929,11 @@ var resultPollTimeout = null;
 function pollForResult() {
     resultPollTimeout = setTimeout(function checkResult() {
         if (!currentScanId) return;
+        var controller = new AbortController();
+        var timer = setTimeout(function() { controller.abort(); }, 5000);
         
-        fetch(API_BASE + '/api/result?scanId=' + encodeURIComponent(currentScanId))
-            .then(function(response) { return response.json(); })
+        fetch(API_BASE + '/api/result?scanId=' + encodeURIComponent(currentScanId), { signal: controller.signal })
+            .then(function(response) { clearTimeout(timer); return response.json(); })
             .then(function(result) {
                 console.log('[pollForResult] result:', result);
                 if (result && result.error) {
@@ -977,6 +975,8 @@ function showReportView() {
     reportDocument.style.animation = 'none';
     void reportDocument.offsetHeight;
     reportDocument.style.animation = '';
+    
+    if (scanModeIndicator) scanModeIndicator.style.display = 'none';
     
     var downloadBar = document.querySelector('.download-bar');
     if (downloadBar) {
@@ -1316,6 +1316,7 @@ function resetToIdle() {
     }
     mainInterface.style.cssText = 'display: flex !important; animation: none !important;';
     mainInterface.classList.add('active');
+    if (scanModeIndicator) scanModeIndicator.style.display = 'flex';
     urlInput.focus();
 }
 
@@ -1425,4 +1426,184 @@ function translateIssueMessage(type, message, suggestion) {
     }
 
     return { message: translatedMsg, suggestion: translatedSug };
+}
+
+// ===== CLIENT-SIDE HTML REPORT GENERATION =====
+var reportHtmlTranslations = {
+    en: { reportTitle: 'Website Scan Report', errors: 'Errors', warnings: 'Warnings', passed: 'Passed', total: 'Total', issuesFound: 'Issues Found', warningsOnly: 'Warnings Only', allClear: 'All Clear', generated: 'Generated', findings: 'Findings', severity: 'Severity', type: 'Type', message: 'Message', element: 'Element', url: 'URL', suggestion: 'Suggestion', jsErrors: 'JavaScript Errors', consoleErrors: 'Console Errors', failedResources: 'Failed Resources', noIssues: 'No issues found — everything looks good!', footer: 'Scanly — Website Content Checker', 'error': 'Error', 'warning': 'Warning', 'info': 'Info' },
+    ja: { reportTitle: 'ウェブサイトスキャンレポート', errors: 'エラー', warnings: '警告', passed: '合格', total: '合計', issuesFound: '問題が見つかりました', warningsOnly: '警告のみ', allClear: 'クリア', generated: '生成日時', findings: '発見された問題', severity: '重大度', type: '種類', message: 'メッセージ', element: '要素', url: 'URL', suggestion: '修正案', jsErrors: 'JavaScriptエラー', consoleErrors: 'コンソールエラー', failedResources: '読み込み失敗リソース', noIssues: '問題はありませんでした！', footer: 'Scanly — ウェブサイトコンテンツチェッカー', 'error': 'エラー', 'warning': '警告', 'info': '情報' },
+    zh: { reportTitle: '网站扫描报告', errors: '错误', warnings: '警告', passed: '通过', total: '总计', issuesFound: '发现问题', warningsOnly: '仅有警告', allClear: '全部通过', generated: '生成时间', findings: '发现的问题', severity: '严重程度', type: '类型', message: '消息', element: '元素', url: 'URL', suggestion: '建议', jsErrors: 'JavaScript 错误', consoleErrors: '控制台错误', failedResources: '加载失败的资源', noIssues: '没有问题！一切正常。', footer: 'Scanly — 网站内容检查器', 'error': '错误', 'warning': '警告', 'info': '信息' },
+    'zh-TW': { reportTitle: '網站掃描報告', errors: '錯誤', warnings: '警告', passed: '通過', total: '總計', issuesFound: '發現問題', warningsOnly: '僅有警告', allClear: '全部通過', generated: '生成時間', findings: '發現的問題', severity: '嚴重程度', type: '類型', message: '訊息', element: '元素', url: 'URL', suggestion: '建議', jsErrors: 'JavaScript 錯誤', consoleErrors: '控制台錯誤', failedResources: '載入失敗的資源', noIssues: '沒有問題！一切正常。', footer: 'Scanly — 網站內容檢查器', 'error': '錯誤', 'warning': '警告', 'info': '資訊' },
+    ko: { reportTitle: '웹사이트 스캔 보고서', errors: '오류', warnings: '경고', passed: '통과', total: '합계', issuesFound: '문제 발견', warningsOnly: '경고만 있음', allClear: '전체 통과', generated: '생성 시각', findings: '발견된 문제', severity: '중요도', type: '유형', message: '메시지', element: '요소', url: 'URL', suggestion: '제안', jsErrors: 'JavaScript 오류', consoleErrors: '콘솔 오류', failedResources: '로드 실패 리소스', noIssues: '문제가 없습니다! 모든 항목이 정상입니다.', footer: 'Scanly — 웹사이트 콘텐츠 체크러', 'error': '오류', 'warning': '경고', 'info': '정보' },
+    ms: { reportTitle: 'Laporan Imbasan Laman Web', errors: 'Ralat', warnings: 'Amaran', passed: 'Lulus', total: 'Jumlah', issuesFound: 'Masalah Ditemui', warningsOnly: 'Amaran Sahaja', allClear: 'Semua Lulus', generated: 'Dijana', findings: 'Masalah Ditemui', severity: 'Tahap', type: 'Jenis', message: 'Mesej', element: 'Elemen', url: 'URL', suggestion: 'Cadangan', jsErrors: 'Ralat JavaScript', consoleErrors: 'Ralat Konsol', failedResources: 'Sumber Gagal Dimuat', noIssues: 'Tiada masalah ditemui — semuanya baik!', footer: 'Scanly — Pemeriksa Kandungan Laman Web', 'error': 'Ralat', 'warning': 'Amaran', 'info': 'Maklumat' }
+};
+
+function reportHtmlClient(result, lang) {
+    lang = lang || 'en';
+    var t = reportHtmlTranslations[lang] || reportHtmlTranslations.en;
+    var issues = result.issues || [];
+    var issuesHtml = issues.map(function(issue) {
+        var severityClass = issue.severity || 'info';
+        var severityLabel = t[issue.severity] || t['info'] || 'Info';
+        return '<tr class="issue-row ' + severityClass + '">' +
+            '<td><span class="badge badge-' + severityClass + '">' + severityLabel + '</span></td>' +
+            '<td class="issue-type">' + escapeHtml(issue.type || '') + '</td>' +
+            '<td class="issue-message">' + escapeHtml(issue.message || '') + '</td>' +
+            '<td class="issue-element">' + escapeHtml(issue.element || '') + '</td>' +
+            '<td class="issue-url"><a href="' + escapeHtml(issue.url) + '" target="_blank">' + escapeHtml(issue.url) + '</a></td>' +
+            (issue.suggestion ? '<td class="issue-suggestion">' + escapeHtml(issue.suggestion) + '</td>' : '') +
+            '</tr>';
+    }).join('');
+
+    var jsErrorsHtml = (result.jsErrors || []).map(function(err) {
+        return '<tr><td class="error-type">' + t.jsErrors + '</td><td class="error-msg">' + escapeHtml(err) + '</td></tr>';
+    }).join('');
+
+    var consoleErrorsHtml = (result.consoleErrors || []).map(function(err) {
+        return '<tr><td class="error-type">' + t.consoleErrors + '</td><td class="error-msg">' + escapeHtml(err) + '</td></tr>';
+    }).join('');
+
+    var failedResponsesHtml = (result.failedResponses || []).map(function(resp) {
+        return '<tr><td class="error-type">' + t.failedResources + '</td><td class="error-msg">' + escapeHtml(resp.url) + ' (HTTP ' + resp.status + ')</td></tr>';
+    }).join('');
+
+    var summary = result.summary || { errors: 0, warnings: 0, info: 0, total: 0 };
+    var errors = summary.errors || 0;
+    var warnings = summary.warnings || 0;
+    var info = summary.info || 0;
+    var statusColor = errors > 0 ? '#dc2626' : warnings > 0 ? '#d97706' : '#16a34a';
+    var statusText = errors > 0 ? t.issuesFound : warnings > 0 ? t.warningsOnly : t.allClear;
+    var statusBg = errors > 0 ? '#fef2f2' : warnings > 0 ? '#fffbeb' : '#f0fdf4';
+    var generatedDate = new Date().toLocaleString(lang === 'en' ? 'en-US' : lang === 'ja' ? 'ja-JP' : lang === 'zh' ? 'zh-CN' : lang === 'zh-TW' ? 'zh-TW' : lang === 'ko' ? 'ko-KR' : lang === 'ms' ? 'ms-MY' : 'en-US');
+    var generatedDateStr = 'Generated: ' + generatedDate;
+    var footerDate = new Date().toLocaleDateString(lang === 'en' ? 'en-US' : lang === 'ja' ? 'ja-JP' : lang === 'zh' ? 'zh-CN' : lang === 'zh-TW' ? 'zh-TW' : lang === 'ko' ? 'ko-KR' : lang === 'ms' ? 'ms-MY' : 'en-US');
+
+    return '<!DOCTYPE html><html lang="' + lang + '"><head>' +
+        '<meta charset="UTF-8">' +
+        '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
+        '<title>' + t.reportTitle + ' — ' + escapeHtml(result.url) + '</title>' +
+        '<style>' +
+        '@page { size: A4; margin: 0; }' +
+        '* { margin: 0; padding: 0; box-sizing: border-box; }' +
+        'body { font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; background: #e5e5e5; color: #1a1a1a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }' +
+        '.page { width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff; position: relative; overflow: hidden; }' +
+        '.accent-bar { height: 6px; background: linear-gradient(90deg, #111 0%, #333 100%); }' +
+        '.report-header { padding: 32mm 20mm 8mm 20mm; display: flex; align-items: flex-start; justify-content: space-between; }' +
+        '.header-left { display: flex; align-items: center; gap: 16px; }' +
+        '.logo { width: 60px; height: 60px; border-radius: 6px; object-fit: contain; }' +
+        '.brand h1 { font-size: 1.1rem; font-weight: 700; color: #111; letter-spacing: 2px; text-transform: uppercase; }' +
+        '.brand .report-label { font-size: 0.7rem; color: #888; letter-spacing: 1.5px; text-transform: uppercase; margin-top: 2px; }' +
+        '.header-right { text-align: right; }' +
+        '.stamp { display: inline-block; border: 2px solid #111; padding: 4px 14px; font-size: 0.65rem; font-weight: 700; letter-spacing: 3px; color: #111; margin-bottom: 8px; }' +
+        '.meta { font-size: 0.72rem; color: #888; line-height: 1.6; }' +
+        '.meta a { color: #2563eb; text-decoration: none; word-break: break-all; }' +
+        '.divider { height: 1px; background: #e5e5e5; margin: 0 20mm; }' +
+        '.summary-section { padding: 10mm 20mm; display: flex; gap: 8px; justify-content: center; }' +
+        '.stat-card { flex: 1; max-width: 140px; text-align: center; padding: 10px 8px; border: 1px solid #e5e5e5; border-radius: 6px; background: #fafafa; }' +
+        '.stat-card .number { font-size: 1.8rem; font-weight: 700; line-height: 1; }' +
+        '.stat-card .label { font-size: 0.6rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }' +
+        '.stat-card.total .number { color: #111; }' +
+        '.stat-card.errors .number { color: #dc2626; }' +
+        '.stat-card.warnings .number { color: #d97706; }' +
+        '.stat-card.info .number { color: #0284c7; }' +
+        '.status-banner { text-align: center; padding: 6px 20mm; font-size: 0.8rem; font-weight: 600; }' +
+        '.content { padding: 6mm 20mm 10mm 20mm; }' +
+        '.section-title { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #111; margin-bottom: 6px; padding-top: 6px; }' +
+        'table { width: 100%; border-collapse: collapse; margin-bottom: 8mm; font-size: 0.75rem; table-layout: fixed; }' +
+        'thead th { background: #f9fafb; padding: 8px 10px; text-align: left; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; color: #374151; border-bottom: 2px solid #e5e5e5; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }' +
+        'thead th:nth-child(1) { width: 8%; }' +
+        'thead th:nth-child(2) { width: 12%; }' +
+        'thead th:nth-child(3) { width: 16%; }' +
+        'thead th:nth-child(4) { width: 20%; }' +
+        'thead th:nth-child(5) { width: 28%; }' +
+        'thead th:nth-child(6) { width: 16%; }' +
+        'tbody td { padding: 8px 10px; border-top: 1px solid #f3f4f6; vertical-align: top; overflow: hidden; text-overflow: ellipsis; }' +
+        'tbody tr.issue-row.error { border-left: 2px solid #dc2626; }' +
+        'tbody tr.issue-row.warning { border-left: 2px solid #d97706; }' +
+        'tbody tr.issue-row.info { border-left: 2px solid #06b6d4; }' +
+        '.badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 0.6rem; font-weight: 700; letter-spacing: 0.5px; }' +
+        '.badge-error { background: #fef2f2; color: #dc2626; }' +
+        '.badge-warning { background: #fffbeb; color: #d97706; }' +
+        '.badge-info { background: #ecfeff; color: #0284c7; }' +
+        '.issue-type { color: #6b7280; font-family: monospace; font-size: 0.7rem; }' +
+        '.issue-element { font-family: monospace; font-size: 0.68rem; color: #6b7280; word-break: break-word; overflow-wrap: break-word; }' +
+        '.issue-url { color: #2563eb; word-break: break-word; overflow-wrap: break-word; }' +
+        '.issue-suggestion { color: #16a34a; font-size: 0.7rem; }' +
+        '.error-msg { color: #dc2626; word-break: break-word; overflow-wrap: break-word; font-size: 0.7rem; }' +
+        '.no-issues { text-align: center; padding: 12mm 0; color: #16a34a; font-size: 0.85rem; font-weight: 500; }' +
+        '.report-footer { position: absolute; bottom: 0; left: 0; right: 0; padding: 6mm 20mm; border-top: 1px solid #e5e5e5; display: flex; justify-content: space-between; align-items: center; }' +
+        '.report-footer .footer-left { font-size: 0.65rem; color: #aaa; letter-spacing: 0.5px; }' +
+        '.report-footer .footer-right { font-size: 0.65rem; color: #aaa; }' +
+        '</style></head><body>' +
+        '<div class="page">' +
+        '<div class="accent-bar"></div>' +
+        '<div class="report-header">' +
+        '<div class="header-left">' +
+        '<img src="images/logo.webp" alt="Scanly" class="logo">' +
+        '<div class="brand"><h1>Scanly</h1><div class="report-label">' + t.reportTitle + '</div></div>' +
+        '</div>' +
+        '<div class="header-right">' +
+        '<div class="stamp">SCANLY</div>' +
+        '<div class="meta"><a href="' + escapeHtml(result.url) + '" target="_blank">' + escapeHtml(result.url) + '</a><br>' + generatedDateStr + '</div>' +
+        '</div></div>' +
+        '<div class="divider"></div>' +
+        '<div class="summary-section">' +
+        '<div class="stat-card total"><div class="number">' + (summary.total || 0) + '</div><div class="label">' + t.total + '</div></div>' +
+        '<div class="stat-card errors"><div class="number">' + errors + '</div><div class="label">' + t.errors + '</div></div>' +
+        '<div class="stat-card warnings"><div class="number">' + warnings + '</div><div class="label">' + t.warnings + '</div></div>' +
+        '<div class="stat-card info"><div class="number">' + info + '</div><div class="label">' + t.passed + '</div></div>' +
+        '</div>' +
+        '<div class="status-banner" style="color:' + statusColor + '; background:' + statusBg + ';">' + statusText + '</div>' +
+        '<div class="content">' +
+        (result.jsErrors && result.jsErrors.length > 0 ? '<div class="section-title" style="color:#dc2626;">' + t.jsErrors + ' (' + result.jsErrors.length + ')</div><table><thead><tr><th>' + t.type + '</th><th>' + t.message + '</th></tr></thead><tbody>' + jsErrorsHtml + '</tbody></table>' : '') +
+        (result.consoleErrors && result.consoleErrors.length > 0 ? '<div class="section-title" style="color:#d97706;">' + t.consoleErrors + ' (' + result.consoleErrors.length + ')</div><table><thead><tr><th>' + t.type + '</th><th>' + t.message + '</th></tr></thead><tbody>' + consoleErrorsHtml + '</tbody></table>' : '') +
+        (result.failedResponses && result.failedResponses.length > 0 ? '<div class="section-title" style="color:#0284c7;">' + t.failedResources + ' (' + result.failedResponses.length + ')</div><table><thead><tr><th>' + t.type + '</th><th>' + t.message + '</th></tr></thead><tbody>' + failedResponsesHtml + '</tbody></table>' : '') +
+        (issues.length > 0 ? '<div class="section-title">' + t.findings + ' (' + issues.length + ')</div><table><thead><tr><th>' + t.severity + '</th><th>' + t.type + '</th><th>' + t.message + '</th><th>' + t.element + '</th><th>' + t.url + '</th><th>' + t.suggestion + '</th></tr></thead><tbody>' + issuesHtml + '</tbody></table>' : '<div class="no-issues">' + t.noIssues + '</div>') +
+        '</div>' +
+        '<div class="report-footer"><div class="footer-left">' + t.footer + '</div><div class="footer-right">' + footerDate + '</div></div>' +
+        '</div></body></html>';
+}
+
+// ===== CLIENT-SIDE PDF DOWNLOAD VIA window.print() =====
+function downloadPdfClient() {
+    if (!lastScanResult) {
+        alert('No scan result available');
+        return;
+    }
+
+    downloadBtn.disabled = true;
+    downloadBtn.textContent = safeT('downloading') || 'Downloading...';
+
+    var lang = languageSelector ? (languageSelector.currentLang || 'en') : 'en';
+    var html = reportHtmlClient(lastScanResult, lang);
+
+    var printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (!printWindow) {
+        alert('Please allow popups to download PDF');
+        downloadBtn.disabled = false;
+        downloadBtn.textContent = safeT('downloadReport') || 'Download Report';
+        return;
+    }
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+
+    printWindow.onload = function() {
+        setTimeout(function() {
+            printWindow.print();
+            downloadBtn.disabled = false;
+            downloadBtn.textContent = safeT('downloadReport') || 'Download Report';
+        }, 500);
+    };
+
+    printWindow.onunload = function() {
+        downloadBtn.disabled = false;
+        downloadBtn.textContent = safeT('downloadReport') || 'Download Report';
+    };
+
+    // Fallback: re-enable button after 3 seconds in case onunload never fires
+    setTimeout(function() {
+        downloadBtn.disabled = false;
+        downloadBtn.textContent = safeT('downloadReport') || 'Download Report';
+    }, 3000);
 }

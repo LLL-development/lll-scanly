@@ -1,5 +1,3 @@
-import { chromium } from 'playwright';
-
 export interface LinkCheckResult {
   url: string;
   status: number;
@@ -8,7 +6,7 @@ export interface LinkCheckResult {
 
 // Rate limiting: track last request time
 let lastRequestTime = 0;
-let rateLimitMs = 100; // default 100ms between requests
+let rateLimitMs = 50; // default 50ms between requests
 
 export function setRateLimit(ms: number) {
   rateLimitMs = ms;
@@ -27,69 +25,40 @@ async function rateLimit(): Promise<void> {
   lastRequestTime = Date.now();
 }
 
-export async function checkLink(url: string, timeout: number = 10000, context?: import('playwright').BrowserContext, retries: number = 2): Promise<LinkCheckResult> {
+export async function checkLink(url: string, timeout: number = 10000, _context?: import('playwright').BrowserContext, retries: number = 1): Promise<LinkCheckResult> {
   // Rate limiting
   await rateLimit();
+
+  // Use native fetch for fast HTTP-only link checking
+  // This avoids launching a browser for each link check
+  let status = 0;
   
-  // If a context is provided, create a temporary page from it to avoid navigating the main page
-  if (context) {
-    const tempPage = await context.newPage();
+  for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      let status = 0;
-      let lastError: Error | null = null;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), Math.min(timeout, 8000));
       
-      // Retry logic for transient errors
-      for (let attempt = 0; attempt <= retries; attempt++) {
-        try {
-          const res = await tempPage.goto(url, { waitUntil: 'commit', timeout });
-          status = res?.status() ?? 0;
-          
-          // Success or non-retryable error
-          if (status > 0 || attempt === retries) {
-            break;
-          }
-          
-          // Retry on transient errors (status 0 = network error, 502, 503, 504)
-          if (status === 0 || status === 502 || status === 503 || status === 504) {
-            await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1))); // Exponential backoff
-            continue;
-          }
-          
-          break; // Non-retryable error
-        } catch (err) {
-          lastError = err instanceof Error ? err : new Error(String(err));
-          if (attempt < retries) {
-            await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1))); // Exponential backoff
-          }
-        }
-      }
-      
-      return { url, status, ok: status > 0 && status < 400 };
-    } finally {
-      await tempPage.close();
-    }
-  }
-
-  // Fallback: launch a new browser if no context provided (for backward compatibility)
-  const browser = await chromium.launch({ headless: true });
-  try {
-    const newContext = await browser.newContext();
-    const newPage = await newContext.newPage();
-
-    let status = 0;
-    try {
-      const res = await newPage.goto(url, { waitUntil: 'commit', timeout });
-      status = res?.status() ?? 0;
+      const res = await fetch(url, {
+        method: 'HEAD',
+        redirect: 'follow',
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Scanly-Crawler/1.0',
+        },
+      });
+      clearTimeout(timer);
+      status = res.status;
+      break;
     } catch {
+      if (attempt < retries) {
+        await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+        continue;
+      }
       status = 0;
     }
-
-    return { url, status, ok: status > 0 && status < 400 };
-  } catch {
-    return { url, status: 0, ok: false };
-  } finally {
-    await browser.close();
   }
+  
+  return { url, status, ok: status > 0 && status < 400 };
 }
 
 export async function closeBrowser(browser: import('playwright').Browser) {

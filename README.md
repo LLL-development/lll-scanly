@@ -5,7 +5,7 @@ Website Content Checker for pre-deployment validation. Scanly scans web pages fo
 ## Features
 
 - **Missing Alt Text** — detects `<img>` tags without `alt` attributes or with generic alt text (e.g. "image", "photo")
-- **Broken Links** — crawls pages and validates all hyperlinks for 4xx/5xx responses
+- **Broken Links** — validates all hyperlinks on a page for 4xx/5xx responses (up to 400 links per page)
 - **Empty Pictures** — finds images with empty, missing, or broken `src` attributes
 - **Empty Buttons** — identifies buttons and submit inputs without text, icons, or `aria-label`
 - **Image Format** — analyzes image formats and suggests standardization (WebP, AVIF). Reports `unsupported-format` as warnings and `format-mix` as info-level suggestions
@@ -13,6 +13,15 @@ Website Content Checker for pre-deployment validation. Scanly scans web pages fo
 - **JavaScript Errors** — captures and reports console errors from scanned pages
 - **Failed Resources** — tracks and reports HTTP 4xx/5xx resource failures
 - **Fix Suggestions** — every issue includes a `suggestion` field with guidance on how to resolve it
+- **Multi-language Reports** — supports English, Japanese, Chinese (Simplified & Traditional), Korean, and Malay
+- **Client-side PDF Export** — generates PDF reports in the browser using `window.print()`, zero server memory cost
+- **CSV Export** — spreadsheet-compatible reports with BOM for Excel
+
+## Scan Modes
+
+- **Quick Scan** — scans a single webpage. Enter any URL and Scanly checks that page for broken links, missing images, and accessibility issues.
+
+> Scanly checks one webpage at a time. Enter the specific URL of the page you want to analyze (e.g., https://example.com) for faster and more accurate results.
 
 ## Installation
 
@@ -68,17 +77,18 @@ The UI will be available at `http://localhost:4000`.
 
 > **Note:** For local development, `npm run dev:ui` injects an empty API base so the frontend connects to the local server. For production deployment, the API base is injected via environment variables during the build process (see `wrangler.toml` for Cloudflare Pages, or set `SCANLY_API_BASE` for other hosts).
 
-### Features
+### UI Features
 
 - Splash screen with click-to-begin animation
+- Animated monster character with eye-tracking (pupils follow cursor)
 - URL input with validation and clear button
+- Quick Scan mode indicator (lightning bolt icon)
 - Real-time progress bar during scans
 - Stop button to abort running scans
-- Animated monster character with eye-tracking (pupils follow cursor)
-- Rotating loading phrases based on scan progress
-- Animated thought icons during scanning
+- Terminal view with real-time scanning output
 - Printer-style report view with sections for each issue type
 - JavaScript errors and failed resources displayed in report
+- Download reports as PDF (client-side) or CSV
 - "Scan Another URL" button to restart
 - Fully responsive design
 
@@ -87,12 +97,13 @@ The UI will be available at `http://localhost:4000`.
 | Endpoint | Method | Description |
 |---|---|---|
 | `/api/scan` | POST | Start a scan. Body: `{ scanUrl, maxPages, timeout, maxDepth, scanMode }` |
-| `/api/status` | GET | Returns `{ scanning: boolean }` |
+| `/api/status` | GET | Returns `{ scanning: boolean, activeScans, activeCount }` |
 | `/api/result` | GET | Returns the last scan result |
 | `/api/progress` | GET | Returns `{ isScanning, currentChecker, progress, message }` |
 | `/api/events` | GET | Returns real-time scan events. Query: `?scanId=&since=` |
 | `/api/stop` | POST | Stops the current scan |
-| `/api/download` | GET | Download report. Query: `?format=&scanId=&lang=` |
+| `/api/download` | GET | Download report. Query: `?format=csv|pdf&scanId=&lang=` |
+| `/api/health` | GET | Health check / keepalive |
 
 > **Concurrency Limit:** Maximum 2 concurrent scans. Excess requests receive a `429` response.
 
@@ -169,7 +180,9 @@ src/
 ├── reporters/            # Output formatters
 │   ├── text.ts
 │   ├── json.ts
-│   └── html.ts
+│   ├── html.ts
+│   ├── csv.ts
+│   └── pdf.ts
 └── utils/                # Helpers
     ├── http.ts
     └── dom.ts
