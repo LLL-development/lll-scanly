@@ -162,9 +162,12 @@ export class Scanner {
 
         // Only crawl further if within depth limit
         if (depth < maxDepth && discoveredPages.length < maxPages) {
+          let page: import('playwright').Page | null = null;
           try {
-            const page = await context.newPage();
+            console.log(`[CRAWL] Loading: ${currentUrl}`);
+            page = await context.newPage();
             await page.goto(currentUrl, { waitUntil: 'domcontentloaded', timeout });
+            console.log(`[CRAWL] Loaded: ${currentUrl}`);
             
             // Get all links from the page
             const links = await page.evaluate(() => {
@@ -189,10 +192,13 @@ export class Scanner {
               }
             }
 
-            await page.close();
           } catch (err) {
             // Failed to load page, continue with others
             console.error(`Failed to crawl ${currentUrl}:`, err);
+          } finally {
+            if (page) {
+              await page.close();
+            }
           }
         }
       }
@@ -232,39 +238,48 @@ export class Scanner {
       `Scanning page ${pageNumber}/${totalPages}...`
     );
 
-    const context = await browser.newContext();
-    const page = await context.newPage();
-    
-    const consoleErrors: string[] = [];
-    const jsErrors: string[] = [];
-    const failedResponses: { url: string; status: number }[] = [];
+    let context: import('playwright').BrowserContext | null = null;
+    let page: import('playwright').Page | null = null;
     
     try {
+      context = await browser.newContext();
+      page = await context.newPage();
+      
+      const consoleErrors: string[] = [];
+      const jsErrors: string[] = [];
+      const failedResponses: { url: string; status: number }[] = [];
+      
       // Set up error handlers
-      page.on('console', (msg) => {
+      const onConsole = (msg: import('playwright').ConsoleMessage) => {
         if (msg.type() === 'error') {
           consoleErrors.push(msg.text());
         }
-      });
-
-      page.on('pageerror', (err) => {
+      };
+      const onPageError = (err: Error) => {
         jsErrors.push(err.message);
-      });
-
-      page.on('response', async (response) => {
+      };
+      const onResponse = async (response: import('playwright').Response) => {
         if (response.status() >= 400) {
           const reqUrl = response.url();
           if (!reqUrl.includes('data:') && !reqUrl.includes('blob:')) {
             failedResponses.push({ url: reqUrl, status: response.status() });
           }
         }
-      });
+      };
 
-      // Navigate to page with networkidle for full reliability
+      page.on('console', onConsole);
+      page.on('pageerror', onPageError);
+      page.on('response', onResponse);
+
+      // Navigate to page with domcontentloaded for reliability
+      // networkidle can hang on pages with infinite polling/WebSockets
       const pageTimeout = Math.min(timeout, 30000);
+      console.log(`[SCAN] Loading: ${pageUrl}`);
       try {
-        await page.goto(pageUrl, { waitUntil: 'networkidle', timeout: pageTimeout });
+        await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: pageTimeout });
+        console.log(`[SCAN] Loaded: ${pageUrl}`);
       } catch {
+        console.error(`[SCAN] Failed to load: ${pageUrl}`);
         // Page may still have useful content even if timeout
       }
 
@@ -315,8 +330,13 @@ export class Scanner {
       return allIssues;
 
     } finally {
-      await page.close();
-      await context.close();
+      // Close page first, then context, handling cases where either may be undefined
+      if (page) {
+        try { await page.close(); } catch { /* ignore */ }
+      }
+      if (context) {
+        try { await context.close(); } catch { /* ignore */ }
+      }
     }
   }
 
@@ -430,10 +450,13 @@ export class Scanner {
         this._abortController?.abort();
       }
       this._abortController = null;
-      // Close browser in background so the result is returned immediately
-      // This prevents the frontend from hanging while waiting for browser cleanup
-      crawlContext.close().catch(() => {});
-      browser.close().catch(() => {});
+      // Close browser and context to free resources
+      try {
+        await crawlContext.close();
+      } catch { /* ignore */ }
+      try {
+        await browser.close();
+      } catch { /* ignore */ }
     }
   }
 
