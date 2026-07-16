@@ -110,11 +110,6 @@ const api = {
         if (this.sessions.has(scanId)) {
           this.sessions.get(scanId)!.isScanning = false;
         }
-        // Clean up session after scan completes (success, failure, or abort)
-        // Give frontend 2s to fetch the result before cleanup
-        setTimeout(() => {
-          this.sessions.delete(scanId);
-        }, 2000);
       }
     })();
 
