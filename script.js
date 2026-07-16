@@ -1,5 +1,13 @@
 // ===== API CONFIGURATION =====
 var API_BASE = '';
+if (API_BASE === '') {
+    var _host = window.location.host;
+    if (_host === 'lll-scanly.pages.dev') {
+        API_BASE = 'https://lll-scanly-api.onrender.com';
+    } else if (_host === 'localhost' || _host.startsWith('localhost:')) {
+        API_BASE = 'http://localhost:4000';
+    }
+}
 
 // ===== KEEPALIVE =====
 var keepaliveInterval = setInterval(function() {
