@@ -243,7 +243,9 @@ export function translateSuggestion(lang: string, suggestion: string): string {
 
   if (suggestion.toLowerCase().includes('alt text')) {
     const translations = langMap['missing-alt'];
-    return translations[lang] || translations.en;
+    const translated = translations[lang] || translations.en;
+    const imgMatch = suggestion.match(/(<img[^>]+>)/);
+    return imgMatch ? translated + ' ' + imgMatch[1] : translated;
   }
 
   if (suggestion.toLowerCase().includes('webp or avif')) {

@@ -573,8 +573,13 @@ function startScan() {
     console.log('Terminal view display:', terminalView.style.display);
 
     var fetchTimeout = setTimeout(function() {
-        setErrorState('Server is sleeping, please try again...');
+        setErrorState(safeT('serverSleeping'));
     }, 45000);
+
+    appendTerminalLineWithReturn(safeT('serverWarming'));
+    var startTime = Date.now();
+    if (terminalLoading) terminalLoading.style.display = 'flex';
+    var dotsVisible = true;
 
     fetch(API_BASE + '/api/scan', {
         method: 'POST',
@@ -590,6 +595,11 @@ function startScan() {
     .then(async function(response) { 
         clearTimeout(fetchTimeout);
         console.log('[scan fetch] status:', response.status);
+        if (dotsVisible && terminalLoading) {
+            terminalLoading.style.display = 'none';
+            dotsVisible = false;
+        }
+        var elapsed = Math.round((Date.now() - startTime) / 1000);
         if (response.status === 429) {
             console.log('[scan fetch] 429 detected');
             try {
@@ -606,12 +616,16 @@ function startScan() {
             setErrorState(data.error);
             return null;
         }
+        if (elapsed > 10) {
+            appendTerminalLineWithReturn(safeT('serverReady') + ' (' + elapsed + 's)');
+        }
         return data;
     })
     .then(function(result) {
         clearTimeout(fetchTimeout);
         if (!result) return;
         currentScanId = result.scanId;
+        if (terminalLoading) terminalLoading.style.display = 'flex';
         startProgressPolling();
         startTerminalPolling();
         pollForResult();
@@ -811,13 +825,13 @@ function startTerminalPolling() {
                     // Auto-scroll to bottom after a brief delay
                     setTimeout(function() {
                         terminalOutput.scrollTop = terminalOutput.scrollHeight;
-                    }, 100);
+                    }, 500);
                 }
             })
             .catch(function(err) {
                 console.error('Failed to fetch events:', err);
             });
-    }, 100);
+    }, 500);
 }
 
 function stopTerminalPolling() {
@@ -879,7 +893,37 @@ function updateLineDepths() {
     }
 }
 
+var lastTerminalMessage = '';
+
+function appendTerminalLineWithReturn(text) {
+    var line = document.createElement('div');
+    line.className = 'terminal-line system';
+    var timestamp = new Date().toLocaleTimeString(languageSelector.currentLang === 'ja' ? 'ja-JP' : languageSelector.currentLang === 'zh' ? 'zh-CN' : languageSelector.currentLang === 'zh-TW' ? 'zh-TW' : languageSelector.currentLang === 'ko' ? 'ko-KR' : languageSelector.currentLang === 'ms' ? 'ms-MY' : 'en-US', { 
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+    line.textContent = '[' + timestamp + '] [SYSTEM] ' + text;
+    terminalOutput.appendChild(line);
+    line.addEventListener('animationend', function onAnimEnd() {
+        line.classList.remove('entering');
+        line.removeEventListener('animationend', onAnimEnd);
+    });
+    updateLineDepths();
+    requestAnimationFrame(function() {
+        terminalOutput.scrollTop = terminalOutput.scrollHeight;
+    });
+    return line;
+}
+
 function appendTerminalLine(event) {
+    var msg = event.message || '';
+    if (msg === lastTerminalMessage && (event.type === 'scan' || event.type === 'crawl' || event.type === 'check')) {
+        return;
+    }
+    lastTerminalMessage = msg;
+    
     var line = document.createElement('div');
     line.className = 'terminal-line ' + event.type + ' entering';
     
@@ -907,6 +951,7 @@ function appendTerminalLine(event) {
     line.setAttribute('data-event-type', event.type);
     line.setAttribute('data-event-message', event.message || '');
     terminalOutput.appendChild(line);
+    if (terminalLoading) terminalLoading.style.display = 'none';
     
     // Remove 'entering' class after animation completes so smooth depth transitions take over
     line.addEventListener('animationend', function onAnimEnd() {
@@ -1446,6 +1491,76 @@ var reportHtmlTranslations = {
     ms: { reportTitle: 'Laporan Imbasan Laman Web', errors: 'Ralat', warnings: 'Amaran', passed: 'Lulus', total: 'Jumlah', issuesFound: 'Masalah Ditemui', warningsOnly: 'Amaran Sahaja', allClear: 'Semua Lulus', generated: 'Dijana', findings: 'Masalah Ditemui', severity: 'Tahap', type: 'Jenis', message: 'Mesej', element: 'Elemen', url: 'URL', suggestion: 'Cadangan', jsErrors: 'Ralat JavaScript', consoleErrors: 'Ralat Konsol', failedResources: 'Sumber Gagal Dimuat', noIssues: 'Tiada masalah ditemui — semuanya baik!', footer: 'Scanly — Pemeriksa Kandungan Laman Web', 'error': 'Ralat', 'warning': 'Amaran', 'info': 'Maklumat' }
 };
 
+function translateClientMessage(lang, type, message) {
+    if (!message) return message;
+    var msgTranslations = {
+        'missing-alt': {
+            'Image is missing alt text': { en: 'Image is missing alt text', ja: '画像にaltテキストがありません', zh: '图片缺少alt文本', 'zh-TW': '圖片缺少alt文字', ko: '이미지에 alt 텍스트가 없습니다', ms: 'Imej tidak mempunyai alt teks' },
+            'Alt text is too generic: "{{text}}"': { en: 'Alt text is too generic: "{{text}}"', ja: 'altテキストが汎用的すぎます: "{{text}}"', zh: 'alt文本过于笼统："{{text}}"', 'zh-TW': 'alt文字過於籠統："{{text}}"', ko: 'alt 텍스트가 너무 일반적입니다: "{{text}}"', ms: 'alt teks terlalu umum: "{{text}}"' }
+        },
+        'format-mix': {
+            'Image uses {{format}} — consider standardizing to WebP for better compression': { en: 'Image uses {{format}} — consider standardizing to WebP for better compression', ja: '画像は{{format}}形式を使用しています — より良い圧縮のためWebPに統一することを検討してください', zh: '图片使用{{format}}格式 — 考虑统一为WebP以获得更好的压缩', 'zh-TW': '圖片使用{{format}}格式 — 考慮統一為WebP以獲得更好的壓縮', ko: '이미지가 {{format}} 형식을 사용합니다 — 더 나은 압축을 위해 WebP로 표준화하는 것을 고려하세요', ms: 'Imej menggunakan {{format}} — pertimbangkan untuk piawaikan kepada WebP untuk mampatan yang lebih baik' }
+        },
+        'unsupported-format': {
+            'Image uses uncommon format: .{{format}}': { en: 'Image uses uncommon format: .{{format}}', ja: '画像は非標準の形式です: .{{format}}', zh: '图片使用不常见的格式：.{{format}}', 'zh-TW': '圖片使用不常見的格式：.{{format}}', ko: '이미지가 흔하지 않은 형식을 사용합니다: .{{format}}', ms: 'Imej menggunakan format yang tidak biasa: .{{format}}' }
+        },
+        'empty-picture': {
+            'Image has empty or missing src attribute': { en: 'Image has empty or missing src attribute', ja: '画像のsrc属性が空または欠落しています', zh: '图片的src属性为空或缺失', 'zh-TW': '圖片的src屬性為空或缺失', ko: '이미지의 src 속성이 비어 있거나 누락되었습니다', ms: 'Imej mempunyai atribut src yang kosong atau hilang' },
+            'Image source is broken: {{url}} (HTTP {{status}})': { en: 'Image source is broken: {{url}} (HTTP {{status}})', ja: '画像ソースが壊れています: {{url}} (HTTP {{status}})', zh: '图片源已损坏：{{url}} (HTTP {{status}})', 'zh-TW': '圖片源已損壞：{{url}} (HTTP {{status}})', ko: '이미지 소스가 손상되었습니다: {{url}} (HTTP {{status}})', ms: 'Sumber imej rosak: {{url}} (HTTP {{status}})' }
+        },
+        'error-render': {
+            'Image failed to render: {{url}}': { en: 'Image failed to render: {{url}}', ja: '画像のレンダリングに失敗しました: {{url}}', zh: '图片渲染失败：{{url}}', 'zh-TW': '圖片渲染失敗：{{url}}', ko: '이미지 렌더링에 실패했습니다: {{url}}', ms: 'Imej gagal dirender: {{url}}' }
+        },
+        'empty-button': {
+            'Button has no visible text, aria-label, title, or icon': { en: 'Button has no visible text, aria-label, title, or icon', ja: 'ボタンに表示テキスト、aria-label、タイトル、またはアイコンがありません', zh: '按钮没有可见文本、aria-label、标题或图标', 'zh-TW': '按鈕沒有可見文字、aria-label、標題或圖示', ko: '버튼에 표시 텍스트, aria-label, 제목 또는 아이콘이 없습니다', ms: 'Butang tidak mempunyai teks, aria-label, tajuk, atau ikon yang kelihatan' }
+        },
+        'broken-link': {
+            'Broken link: {{url}} (HTTP {{status}})': { en: 'Broken link: {{url}} (HTTP {{status}})', ja: 'リンクが壊れています: {{url}} (HTTP {{status}})', zh: '链接已损坏：{{url}} (HTTP {{status}})', 'zh-TW': '連結已損壞：{{url}} (HTTP {{status}})', ko: '링크가 손상되었습니다: {{url}} (HTTP {{status}})', ms: 'Pautan rosak: {{url}} (HTTP {{status}})' },
+            'Broken link: {{url}} (network error or timeout)': { en: 'Broken link: {{url}} (network error or timeout)', ja: 'リンクが壊れています: {{url}} (ネットワークエラーまたはタイムアウト)', zh: '链接已损坏：{{url}} (网络错误或超时)', 'zh-TW': '連結已損壞：{{url}} (網路錯誤或超時)', ko: '링크가 손상되었습니다: {{url}} (네트워크 오류 또는 시간 초과)', ms: 'Pautan rosak: {{url}} (ralat rangkaian atau tamat masa)' }
+        }
+    };
+    var typeMap = msgTranslations[type];
+    if (!typeMap) return message;
+    for (var enPattern in typeMap) {
+        if (message === enPattern || message.startsWith(enPattern.split('{{')[0])) {
+            var translations = typeMap[enPattern];
+            var translated = translations[lang] || translations.en;
+            var urlMatch = message.match(/(https?:\/\/[^\s)]+)/);
+            if (urlMatch) translated = translated.replace(/\{\{url\}\}/g, urlMatch[1]);
+            var statusMatch = message.match(/HTTP (\d+)/);
+            if (statusMatch) translated = translated.replace(/\{\{status\}\}/g, statusMatch[1]);
+            var formatMatch = message.match(/(?:\.(\w+))|(?:uses\s+([A-Z]+))/);
+            if (formatMatch) {
+                var format = formatMatch[1] || formatMatch[2];
+                if (format) translated = translated.replace(/\{\{format\}\}/g, format.toUpperCase());
+            }
+            var altMatch = message.match(/"([^"]+)"/);
+            if (altMatch) translated = translated.replace(/\{\{text\}\}/g, altMatch[1]);
+            return translated;
+        }
+    }
+    return message;
+}
+
+function translateClientSuggestion(lang, suggestion) {
+    if (!suggestion) return suggestion;
+    var sugMap = {
+        'missing-alt': { en: 'Add descriptive alt text:', ja: '説明的なaltテキストを追加してください:', zh: '添加描述性alt文本：', 'zh-TW': '添加描述性alt文字：', ko: '추가적인 설명 alt 텍스트를 추가하세요:', ms: 'Tambahkan alt teks yang menerangkan:' },
+        'format-mix': { en: 'Use WebP or AVIF for optimized image delivery', ja: '最適化された画像配信にはWebPまたはAVIFを使用してください', zh: '使用WebP或AVIF进行优化的图像交付', 'zh-TW': '使用WebP或AVIF進行優化的圖像交付', ko: '최적화된 이미지 전달을 위해 WebP 또는 AVIF를 사용하세요', ms: 'Gunakan WebP atau AVIF untuk penghantaran imej yang dioptimumkan' },
+        'unsupported-format': { en: 'Consider converting to WebP or PNG for better compatibility', ja: 'より良い互換性のためにWebPまたはPNGに変換することを検討してください', zh: '考虑转换为WebP或PNG以获得更好的兼容性', 'zh-TW': '考慮轉換為WebP或PNG以獲得更好的相容性', ko: '더 나은 호환성을 위해 WebP 또는 PNG로 변환하는 것을 고려하세요', ms: 'Pertimbangkan untuk menukar kepada WebP atau PNG untuk keserasian yang lebih baik' },
+        'error-render': { en: 'Fix the image path or ensure the file exists', ja: '画像パスを修正するか、ファイルが存在することを確認してください', zh: '修复图像路径或确保文件存在', 'zh-TW': '修復圖像路徑或確保檔案存在', ko: '이미지 경로를 수정하거나 파일이 존재하는지 확인하세요', ms: 'Betulkan laluan imej atau pastikan fail wujud' }
+    };
+    if (suggestion.toLowerCase().includes('alt text')) {
+        var t = sugMap['missing-alt'][lang] || sugMap['missing-alt'].en;
+        var imgMatch = suggestion.match(/(<img[^>]+>)/);
+        return imgMatch ? t + ' ' + imgMatch[1] : t;
+    }
+    if (suggestion.toLowerCase().includes('webp or avif')) return (sugMap['format-mix'][lang] || sugMap['format-mix'].en);
+    if (suggestion.toLowerCase().includes('converting to webp or png')) return (sugMap['unsupported-format'][lang] || sugMap['unsupported-format'].en);
+    if (suggestion.toLowerCase().includes('fix the image path')) return (sugMap['error-render'][lang] || sugMap['error-render'].en);
+    return suggestion;
+}
+
 function reportHtmlClient(result, lang) {
     lang = lang || 'en';
     var t = reportHtmlTranslations[lang] || reportHtmlTranslations.en;
@@ -1453,13 +1568,15 @@ function reportHtmlClient(result, lang) {
     var issuesHtml = issues.map(function(issue) {
         var severityClass = issue.severity || 'info';
         var severityLabel = t[issue.severity] || t['info'] || 'Info';
+        var translatedMessage = translateClientMessage(lang, issue.type, issue.message || '');
+        var translatedSuggestion = translateClientSuggestion(lang, issue.suggestion || '');
         return '<tr class="issue-row ' + severityClass + '">' +
             '<td><span class="badge badge-' + severityClass + '">' + severityLabel + '</span></td>' +
             '<td class="issue-type">' + escapeHtml(issue.type || '') + '</td>' +
-            '<td class="issue-message">' + escapeHtml(issue.message || '') + '</td>' +
+            '<td class="issue-message">' + escapeHtml(translatedMessage) + '</td>' +
             '<td class="issue-element">' + escapeHtml(issue.element || '') + '</td>' +
             '<td class="issue-url"><a href="' + escapeHtml(issue.url) + '" target="_blank">' + escapeHtml(issue.url) + '</a></td>' +
-            (issue.suggestion ? '<td class="issue-suggestion">' + escapeHtml(issue.suggestion) + '</td>' : '') +
+            (translatedSuggestion ? '<td class="issue-suggestion">' + escapeHtml(translatedSuggestion) + '</td>' : '') +
             '</tr>';
     }).join('');
 
@@ -1521,11 +1638,12 @@ function reportHtmlClient(result, lang) {
         'thead th { background: #f9fafb; padding: 8px 10px; text-align: left; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; color: #374151; border-bottom: 2px solid #e5e5e5; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }' +
         'thead th:nth-child(1) { width: 8%; }' +
         'thead th:nth-child(2) { width: 12%; }' +
-        'thead th:nth-child(3) { width: 16%; }' +
-        'thead th:nth-child(4) { width: 20%; }' +
-        'thead th:nth-child(5) { width: 28%; }' +
-        'thead th:nth-child(6) { width: 16%; }' +
+        'thead th:nth-child(3) { width: 14%; }' +
+        'thead th:nth-child(4) { width: 16%; }' +
+        'thead th:nth-child(5) { width: 24%; }' +
+        'thead th:nth-child(6) { width: 26%; }' +
         'tbody td { padding: 8px 10px; border-top: 1px solid #f3f4f6; vertical-align: top; overflow: hidden; text-overflow: ellipsis; }' +
+        'tbody td.issue-suggestion { overflow: visible; text-overflow: clip; word-wrap: break-word; white-space: normal; }' +
         'tbody tr.issue-row.error { border-left: 2px solid #dc2626; }' +
         'tbody tr.issue-row.warning { border-left: 2px solid #d97706; }' +
         'tbody tr.issue-row.info { border-left: 2px solid #06b6d4; }' +
