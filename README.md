@@ -1,5 +1,7 @@
 # Scanly
 
+Developed by LLL Inc.'s dev team — visit us at https://www.live-laugh-love.world
+
 Website Content Checker for pre-deployment validation. Scanly scans web pages for accessibility issues, broken links, empty images, and more.
 
 ## Features
