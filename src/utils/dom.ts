@@ -39,9 +39,11 @@ export async function getLinks($page: Page, baseUrl: string): Promise<string[]> 
       const href = a.getAttribute('href');
       if (href) {
         try {
-          const resolved = new URL(href, base).href;
-          if (!resolved.startsWith('javascript:') && !resolved.startsWith('#') && !resolved.startsWith('data:')) {
-            links.push(resolved);
+          const resolved = new URL(href, base);
+          // This collection feeds native HTTP HEAD checks, not browser navigation
+          // or app/deep-link handlers. Only supported network protocols belong here.
+          if (resolved.protocol === 'http:' || resolved.protocol === 'https:') {
+            links.push(resolved.href);
           }
         } catch {
           // skip invalid URLs
