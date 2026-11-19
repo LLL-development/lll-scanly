@@ -382,8 +382,8 @@ export function translateMessage(lang: string, type: string, message: string): s
       const translated = langTranslations[lang] || langTranslations.en;
       // Replace placeholders with actual values from the original message
       let result = translated;
-      const urlMatch = message.match(/(https?:\/\/[^\s)]+)/);
-      if (urlMatch) result = result.replace(/\{\{url\}\}/g, urlMatch[1]);
+      const urlMatch = message.match(/\b(https?:\/\/[^\s)]+|mailto:[^\s)]+|tel:[^\s)]+|ftp:\/\/[^\s)]+)/);
+      if (urlMatch) result = result.replace(/\{\{url\}\}/g, () => urlMatch[1]);
       const statusMatch = message.match(/HTTP (\d+)/);
       if (statusMatch) result = result.replace(/\{\{status\}\}/g, statusMatch[1]);
       const formatMatch = message.match(/(?:\.(\w+))|(?:uses\s+([A-Z]+))/);
@@ -538,7 +538,7 @@ export function reportHtml(result: ScanResult, lang = 'en'): string {
       <div class="stat-card total"><div class="number">${result.summary.total}</div><div class="label">${t(lang, 'total')}</div></div>
       <div class="stat-card errors"><div class="number">${errors}</div><div class="label">${t(lang, 'errors')}</div></div>
       <div class="stat-card warnings"><div class="number">${warnings}</div><div class="label">${t(lang, 'warnings')}</div></div>
-      <div class="stat-card info"><div class="number">${info}</div><div class="label">${t(lang, 'passed')}</div></div>
+      <div class="stat-card info"><div class="number">${info}</div><div class="label">${t(lang, 'info')}</div></div>
     </div>
     <div class="status-banner" style="color:${statusColor}; background:${statusBg};">${statusText}</div>
     <div class="content">

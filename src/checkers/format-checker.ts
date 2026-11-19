@@ -76,6 +76,13 @@ export class FormatChecker implements Checker {
       if (err instanceof Error && err.message === 'Scan aborted by user') {
         throw err;
       }
+      issues.push({
+        type: 'format-check',
+        severity: 'error',
+        url,
+        message: `Format check failed: ${err instanceof Error ? err.message : String(err)}`,
+        suggestion: 'Check page accessibility and network connectivity',
+      });
       return issues;
     }
 

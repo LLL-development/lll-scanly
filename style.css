@@ -1554,6 +1554,29 @@ body {
     font-weight: bold;
 }
 
+.terminal-status.working::after {
+    content: '';
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    margin-left: 8px;
+    border-radius: 50%;
+    background: #3b3b3b;
+    vertical-align: middle;
+    animation: terminalWorkingPulse 1.2s infinite ease-in-out;
+}
+
+@keyframes terminalWorkingPulse {
+    0%, 100% {
+        opacity: 0.25;
+        transform: scale(0.7);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.15);
+    }
+}
+
 /* ===== APP HEADER BANNER ===== */
 .app-header {
     position: fixed;
