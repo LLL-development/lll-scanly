@@ -33,8 +33,7 @@ const api = {
   maxEventsPerSession: 500,
 
   async scan(url: string, maxPages: number = 1, timeout: number = 60000, maxDepth: number = 5, scanMode?: string) {
-    // Clean up any completed sessions before starting a new scan
-    this.cleanupCompleted();
+    // Removed: cleanupCompleted() was deleting completed scans before frontend could retrieve results
 
     const scanId = generateScanId();
     const modeLabel = scanMode === 'deep' ? 'Deep Scan' : scanMode === 'custom' ? 'Custom Scan' : 'Quick Scan';
@@ -184,20 +183,10 @@ const api = {
     return { stopped: true, scanId };
   },
 
-  cleanupCompleted() {
-    const completed: string[] = [];
-    for (const [id, session] of this.sessions) {
-      if (!session.isScanning) {
-        completed.push(id);
-      }
-    }
-    for (const id of completed) {
-      this.sessions.delete(id);
-    }
-    return completed;
-  }
 };
 
+// Remove completed sessions cleanup — completed scans must remain
+// available for result retrieval. Only clean up idle sessions.
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 
 setInterval(() => {
@@ -210,7 +199,6 @@ setInterval(() => {
       console.log(`[API] Cleaned up idle scan: ${id}`);
     }
   }
-  api.cleanupCompleted();
 }, 60000);
 
 export default api;

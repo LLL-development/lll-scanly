@@ -33,20 +33,7 @@ export class EmptyButtonChecker implements Checker {
           throw new Error('Scan aborted by user');
         }
         
-        const btnIndex = buttons.indexOf(btn);
-        const ariaLabel = await page.evaluate(({ tag, index }: { tag: string; index: number }) => {
-          let el: Element | null = null;
-          if (tag === 'button') {
-            const buttons = document.querySelectorAll('button');
-            el = buttons[index] || null;
-          } else {
-            const inputs = document.querySelectorAll('input[type="submit"], input[type="button"]');
-            el = inputs[index] || null;
-          }
-          return el?.getAttribute('aria-label') ?? '';
-        }, { tag: btn.tag, index: btnIndex });
-
-        if (!btn.text && !btn.hasIcon && !ariaLabel.trim()) {
+        if (!btn.text && !btn.hasIcon && !btn.ariaLabel.trim() && !btn.title.trim() && !btn.ariaLabelledby.trim()) {
           issues.push({
             type: 'empty-button',
             severity: 'warning',
@@ -61,6 +48,13 @@ export class EmptyButtonChecker implements Checker {
       if (err instanceof Error && err.message === 'Scan aborted by user') {
         throw err;
       }
+      issues.push({
+        type: 'empty-button',
+        severity: 'error',
+        url,
+        message: `Empty button check failed: ${err instanceof Error ? err.message : String(err)}`,
+        suggestion: 'Check page accessibility and network connectivity',
+      });
       return issues;
     }
 

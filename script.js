@@ -333,6 +333,33 @@ const terminalStatus = document.getElementById('terminalStatus');
 const terminalLoading = document.getElementById('terminalLoading');
 const closeTerminal = document.getElementById('closeTerminal');
 
+var terminalWorking = false;
+var terminalCheckerName = '';
+
+function setTerminalWorking(active, checker) {
+    if (checker !== undefined) terminalCheckerName = checker || '';
+    terminalWorking = !!active;
+    applyTerminalStatusText();
+}
+
+function applyTerminalStatusText() {
+    if (!terminalStatus) return;
+    if (terminalWorking) {
+        var label = safeT('terminalChecking');
+        var text = String(label).split('{{checker}}').join(terminalCheckerName);
+        terminalStatus.textContent = text.replace(/\s{2,}/g, ' ').trim();
+        terminalStatus.classList.add('working');
+    } else {
+        terminalStatus.classList.remove('working');
+    }
+}
+
+function resetTerminalWorking() {
+    terminalWorking = false;
+    terminalCheckerName = '';
+    if (terminalStatus) terminalStatus.classList.remove('working');
+}
+
 var progressAnimFrame = null;
 var progressAnimActive = false;
 
@@ -655,6 +682,7 @@ function stopScan() {
         showReportView();
         scanAgainButton.style.display = 'inline-block';
         if (terminalLoading) terminalLoading.style.display = 'none';
+        resetTerminalWorking();
         reportUrl.textContent = urlInput.value.trim();
         reportErrorCount.textContent = '1';
         reportWarningCount.textContent = '0';
@@ -682,6 +710,7 @@ function stopScan() {
         showReportView();
         scanAgainButton.style.display = 'inline-block';
         if (terminalLoading) terminalLoading.style.display = 'none';
+        resetTerminalWorking();
         reportUrl.textContent = urlInput.value.trim();
         reportErrorCount.textContent = '1';
         reportWarningCount.textContent = '0';
@@ -703,6 +732,7 @@ function stopScan() {
         showReportView();
         scanAgainButton.style.display = 'inline-block';
         if (terminalLoading) terminalLoading.style.display = 'none';
+        resetTerminalWorking();
         reportUrl.textContent = urlInput.value.trim();
         reportErrorCount.textContent = '1';
         reportWarningCount.textContent = '0';
@@ -766,6 +796,7 @@ function startProgressPolling() {
             .then(function(response) { clearTimeout(timer); return response.json(); })
             .then(function(data) {
                 if (data.isScanning) {
+                    setTerminalWorking(true, data.currentChecker || '');
                     if (progressAnimActive && data.progress > 0) {
                         progressAnimActive = false;
                         if (progressAnimFrame) cancelAnimationFrame(progressAnimFrame);
@@ -779,6 +810,7 @@ function startProgressPolling() {
                     }
                 } else if (!scanDone) {
                     scanDone = true;
+                    setTerminalWorking(false);
                     stopProgressAnimation();
                 }
             })
@@ -968,12 +1000,16 @@ function appendTerminalLine(event) {
     });
     
     // Update terminal status
-    if (event.type === 'scan') {
-        terminalStatus.textContent = event.message;
-    } else if (event.type === 'complete') {
+    if (event.type === 'complete') {
+        setTerminalWorking(false);
         terminalStatus.textContent = safeT('terminalComplete');
     } else if (event.type === 'error') {
+        setTerminalWorking(false);
         terminalStatus.textContent = safeT('terminalError') + event.message;
+    } else if (terminalWorking) {
+        applyTerminalStatusText();
+    } else if (event.type === 'scan') {
+        terminalStatus.textContent = event.message;
     }
 }
 
@@ -999,6 +1035,7 @@ function pollForResult() {
                     setMonsterState(result);
                     scanAgainButton.style.display = 'inline-block';
                     if (terminalLoading) terminalLoading.style.display = 'none';
+                    resetTerminalWorking();
                     return;
                 }
                 console.log('[pollForResult] No results yet, polling again...');
@@ -1409,14 +1446,17 @@ var retranslateTerminal = function() {
         }
     }
     if (terminalStatus) {
-        var statusText = terminalStatus.textContent;
-        var completeText = languageSelector.t('terminalComplete');
-        var errorText = languageSelector.t('terminalError');
-        if (statusText === 'Complete!') {
-            terminalStatus.textContent = completeText;
-        } else if (statusText.indexOf(errorText) === 0) {
-            var errMsg = statusText.substring(errorText.length);
-            terminalStatus.textContent = errorText + errMsg;
+        if (terminalWorking) applyTerminalStatusText();
+        else {
+            var statusText = terminalStatus.textContent;
+            var completeText = languageSelector.t('terminalComplete');
+            var errorText = languageSelector.t('terminalError');
+            if (statusText === 'Complete!') {
+                terminalStatus.textContent = completeText;
+            } else if (statusText.indexOf(errorText) === 0) {
+                var errMsg = statusText.substring(errorText.length);
+                terminalStatus.textContent = errorText + errMsg;
+            }
         }
     }
 };
@@ -1445,6 +1485,20 @@ function translateIssueMessage(type, message, suggestion) {
 
     var msgKey = type + (type === 'poor-alt' ? '-generic' : '');
     var sugKey = type + '-suggestion';
+    // broken-link sub-cases: bot-block candidate vs network error/timeout vs real breakage.
+    // - "Possible block:" -> dedicated block template/suggestion (do NOT rewrite to "Broken link:")
+    // - network error/timeout (no "HTTP <digits>") -> network template (no {{status}} placeholder)
+    //   + block-style suggestion (manual verification is the right advice for both)
+    // - otherwise (404/410 real breakage) -> keep broken-link / broken-link-suggestion
+    if (type === 'broken-link' && message) {
+        if (message.indexOf('Possible block:') === 0 && keys['broken-link-block']) {
+            msgKey = 'broken-link-block';
+            sugKey = 'broken-link-block-suggestion';
+        } else if (!/HTTP \d+/.test(message) && keys['broken-link-network']) {
+            msgKey = 'broken-link-network';
+            sugKey = 'broken-link-block-suggestion';
+        }
+    }
     
     var translatedMsg = keys[msgKey] || message;
     var translatedSug = keys[sugKey] || suggestion;
@@ -1476,6 +1530,14 @@ function translateIssueMessage(type, message, suggestion) {
     if (suggestion) {
         var urlMatch2 = suggestion.match(/<img src="([^"]+)"/);
         if (urlMatch2) translatedSug = translatedSug.replace(/\{\{src\}\}/g, urlMatch2[1]);
+    }
+
+    // Defensive cleanup: strip any leftover unreplaced {{...}} placeholders
+    if (translatedMsg && translatedMsg.indexOf('{{') !== -1) {
+        translatedMsg = translatedMsg.replace(/\s*\{\{[^}]*\}\}/g, '');
+    }
+    if (translatedSug && translatedSug.indexOf('{{') !== -1) {
+        translatedSug = translatedSug.replace(/\s*\{\{[^}]*\}\}/g, '');
     }
 
     return { message: translatedMsg, suggestion: translatedSug };
@@ -1516,11 +1578,26 @@ function translateClientMessage(lang, type, message) {
         },
         'broken-link': {
             'Broken link: {{url}} (HTTP {{status}})': { en: 'Broken link: {{url}} (HTTP {{status}})', ja: 'リンクが壊れています: {{url}} (HTTP {{status}})', zh: '链接已损坏：{{url}} (HTTP {{status}})', 'zh-TW': '連結已損壞：{{url}} (HTTP {{status}})', ko: '링크가 손상되었습니다: {{url}} (HTTP {{status}})', ms: 'Pautan rosak: {{url}} (HTTP {{status}})' },
+            'Possible block: {{url}} (HTTP {{status}})': { en: 'Link may be blocked for automated access: {{url}} (HTTP {{status}})', ja: '自動化アクセスがブロックされた可能性があります: {{url}} (HTTP {{status}})', zh: '可能已阻止自动化访问：{{url}} (HTTP {{status}})', 'zh-TW': '可能已封鎖自動化存取：{{url}} (HTTP {{status}})', ko: '자동화된 접근이 차단되었을 수 있습니다: {{url}} (HTTP {{status}})', ms: 'Akses automatik mungkin disekat: {{url}} (HTTP {{status}})' },
             'Broken link: {{url}} (network error or timeout)': { en: 'Broken link: {{url}} (network error or timeout)', ja: 'リンクが壊れています: {{url}} (ネットワークエラーまたはタイムアウト)', zh: '链接已损坏：{{url}} (网络错误或超时)', 'zh-TW': '連結已損壞：{{url}} (網路錯誤或超時)', ko: '링크가 손상되었습니다: {{url}} (네트워크 오류 또는 시간 초과)', ms: 'Pautan rosak: {{url}} (ralat rangkaian atau tamat masa)' }
         }
     };
     var typeMap = msgTranslations[type];
     if (!typeMap) return message;
+    // broken-link network error/timeout (no "HTTP <digits>") must match the dedicated
+    // network pattern entry first, otherwise it falls into the HTTP {{status}} template
+    // and leaves a literal "{{status}}" behind.
+    if (type === 'broken-link' && !/HTTP \d+/.test(message)) {
+        var netPattern = 'Broken link: {{url}} (network error or timeout)';
+        var netTranslations = typeMap[netPattern];
+        if (netTranslations) {
+            var netTranslated = netTranslations[lang] || netTranslations.en;
+            var netUrlMatch = message.match(/(https?:\/\/[^\s)]+)/);
+            if (netUrlMatch) netTranslated = netTranslated.replace(/\{\{url\}\}/g, netUrlMatch[1]);
+            if (netTranslated.indexOf('{{') !== -1) netTranslated = netTranslated.replace(/\s*\{\{[^}]*\}\}/g, '');
+            return netTranslated;
+        }
+    }
     for (var enPattern in typeMap) {
         if (message === enPattern || message.startsWith(enPattern.split('{{')[0])) {
             var translations = typeMap[enPattern];
@@ -1536,6 +1613,8 @@ function translateClientMessage(lang, type, message) {
             }
             var altMatch = message.match(/"([^"]+)"/);
             if (altMatch) translated = translated.replace(/\{\{text\}\}/g, altMatch[1]);
+            // Defensive cleanup: strip any leftover unreplaced {{...}} placeholders
+            if (translated.indexOf('{{') !== -1) translated = translated.replace(/\s*\{\{[^}]*\}\}/g, '');
             return translated;
         }
     }

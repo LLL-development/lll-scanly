@@ -226,7 +226,7 @@ export class Scanner {
     totalPages: number,
     timeout: number,
     browser: import('playwright').Browser
-  ): Promise<Issue[]> {
+  ): Promise<PageResult> {
     this.emitEvent('scan', `Page ${pageNumber}/${totalPages}: ${pageUrl}`, { 
       url: pageUrl, 
       current: pageNumber, 
@@ -327,7 +327,18 @@ export class Scanner {
         }
       }
 
-      return allIssues;
+      const errors = allIssues.filter(i => i.severity === 'error').length;
+      const warnings = allIssues.filter(i => i.severity === 'warning').length;
+      const info = allIssues.filter(i => i.severity === 'info').length;
+
+      return {
+        url: pageUrl,
+        issues: allIssues,
+        jsErrors,
+        consoleErrors,
+        failedResponses,
+        summary: { total: allIssues.length, errors, warnings, info },
+      };
 
     } finally {
       // Close page first, then context, handling cases where either may be undefined
@@ -382,22 +393,14 @@ export class Scanner {
         }
 
         const pageUrl = pagesToScan[i];
-        const pageIssues = await this.scanPage(pageUrl, i + 1, totalPages, timeout, browser);
-        
-        allIssues.push(...pageIssues);
+        const pageResult = await this.scanPage(pageUrl, i + 1, totalPages, timeout, browser);
 
-        const pageErrors = pageIssues.filter(issue => issue.severity === 'error').length;
-        const pageWarnings = pageIssues.filter(issue => issue.severity === 'warning').length;
-        const pageInfo = pageIssues.filter(issue => issue.severity === 'info').length;
+        allIssues.push(...pageResult.issues);
+        allJsErrors.push(...pageResult.jsErrors);
+        allConsoleErrors.push(...pageResult.consoleErrors);
+        allFailedResponses.push(...pageResult.failedResponses);
 
-        pages.push({
-          url: pageUrl,
-          issues: pageIssues,
-          jsErrors: [],
-          consoleErrors: [],
-          failedResponses: [],
-          summary: { total: pageIssues.length, errors: pageErrors, warnings: pageWarnings, info: pageInfo },
-        });
+        pages.push(pageResult);
       }
 
       this.updateProgress(95, 'Finalizing results...');

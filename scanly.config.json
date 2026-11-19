@@ -13,7 +13,6 @@
     "emptyPictures": true,
     "emptyButtons": true,
     "formatCheck": true,
-    "errorRender": true,
-    "seo": true
+    "errorRender": true
   }
 }

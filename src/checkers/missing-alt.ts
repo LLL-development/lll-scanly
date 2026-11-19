@@ -39,7 +39,10 @@ export class MissingAltChecker implements Checker {
           const imgSrc = img.src || '';
           const rawSrc = img.rawSrc || imgSrc;
 
-          if (!img.alt || img.alt.trim() === '') {
+          // alt="" (empty but present) means decorative image — intentional, not an error
+          if (img.hasAltAttr && img.alt.trim() === '') continue;
+
+          if (!img.hasAltAttr || img.alt.trim() === '') {
             issues.push({
               type: 'missing-alt',
               severity: 'error',
@@ -63,6 +66,13 @@ export class MissingAltChecker implements Checker {
       if (err instanceof Error && err.message === 'Scan aborted by user') {
         throw err;
       }
+      issues.push({
+        type: 'missing-alt',
+        severity: 'error',
+        url,
+        message: `Missing alt check failed: ${err instanceof Error ? err.message : String(err)}`,
+        suggestion: 'Check page accessibility and network connectivity',
+      });
       return issues;
     }
 

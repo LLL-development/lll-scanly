@@ -49,6 +49,11 @@ export class EmptyPictureChecker implements Checker {
           continue;
         }
 
+        // Skip data: and blob: URIs — they're inline/browser-generated, not HTTP resources
+        if (imgSrc.startsWith('data:') || imgSrc.startsWith('blob:')) {
+          continue;
+        }
+
         const result = await checkLink(imgSrc, timeout, options?.context);
         if (!result.ok) {
           issues.push({
@@ -65,6 +70,13 @@ export class EmptyPictureChecker implements Checker {
       if (err instanceof Error && err.message === 'Scan aborted by user') {
         throw err;
       }
+      issues.push({
+        type: 'empty-picture',
+        severity: 'error',
+        url,
+        message: `Empty picture check failed: ${err instanceof Error ? err.message : String(err)}`,
+        suggestion: 'Check page accessibility and network connectivity',
+      });
       return issues;
     }
 

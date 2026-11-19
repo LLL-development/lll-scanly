@@ -3,7 +3,6 @@
     "target": "es2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "module": "ESNext",
     "types": ["node"],
     "outDir": "dist",
     "rootDir": "src",

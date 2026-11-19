@@ -71,7 +71,16 @@ const server = createServer(async (req, res) => {
     for await (const chunk of req) {
       body += chunk;
     }
-    const parsed = JSON.parse(body);
+    
+    let parsed;
+    try {
+      parsed = JSON.parse(body);
+    } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+      return;
+    }
+    
     const { scanUrl, maxPages, timeout, scanId, scanMode } = parsed;
 
     if (!scanUrl) {
@@ -124,7 +133,17 @@ const server = createServer(async (req, res) => {
     for await (const chunk of req) {
       body += chunk;
     }
-    const { scanId } = JSON.parse(body || '{}');
+    
+    let scanId: string | undefined;
+    try {
+      const parsed = JSON.parse(body || '{}');
+      scanId = parsed?.scanId;
+    } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+      return;
+    }
+    
     res.writeHead(200, { 'Content-Type': 'application/json' });
     const result = await api.stop(scanId || '');
     res.end(JSON.stringify(result));
